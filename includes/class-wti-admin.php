@@ -10,6 +10,9 @@ class WTI_Admin {
 			'category_mode'   => 'auto',
 			'markup_percent'  => '0',
 			'sync_time'       => '15:00',
+			'dry_run'         => 'yes',
+			'import_limit'    => 10,
+			'product_status'  => 'draft',
 			'selected_paths'  => self::get_default_totobi_paths(),
 			'category_map'    => array(),
 		);
@@ -91,6 +94,9 @@ class WTI_Admin {
 			'category_mode'  => isset( $_POST['category_mode'] ) && 'manual' === $_POST['category_mode'] ? 'manual' : 'auto',
 			'markup_percent' => isset( $_POST['markup_percent'] ) ? sanitize_text_field( wp_unslash( $_POST['markup_percent'] ) ) : '0',
 			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '15:00',
+			'dry_run'        => empty( $_POST['dry_run'] ) ? 'no' : 'yes',
+			'import_limit'   => isset( $_POST['import_limit'] ) ? max( 1, absint( wp_unslash( $_POST['import_limit'] ) ) ) : 10,
+			'product_status' => isset( $_POST['product_status'] ) && in_array( $_POST['product_status'], array( 'draft', 'publish' ), true ) ? sanitize_key( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 			'selected_paths' => $paths ? $paths : self::get_default_totobi_paths(),
 			'category_map'   => array(),
 		);
@@ -164,6 +170,28 @@ class WTI_Admin {
 							<p class="description"><?php echo esc_html( $next_run ? sprintf( __( 'Next run: %s', WTI_TEXT_DOMAIN ), wp_date( 'Y-m-d H:i:s', $next_run ) ) : __( 'Not scheduled yet.', WTI_TEXT_DOMAIN ) ); ?></p>
 						</td>
 					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Write mode', WTI_TEXT_DOMAIN ); ?></th>
+						<td>
+							<label><input type="checkbox" name="dry_run" value="yes" <?php checked( $settings['dry_run'], 'yes' ); ?>> <?php esc_html_e( 'Dry-run only, do not create or update products', WTI_TEXT_DOMAIN ); ?></label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="import_limit"><?php esc_html_e( 'Simple product write limit', WTI_TEXT_DOMAIN ); ?></label></th>
+						<td>
+							<input type="number" min="1" max="100" id="import_limit" name="import_limit" value="<?php echo esc_attr( $settings['import_limit'] ); ?>">
+							<p class="description"><?php esc_html_e( 'Only simple products are writable at this stage. Variations and images are still skipped.', WTI_TEXT_DOMAIN ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="product_status"><?php esc_html_e( 'Created product status', WTI_TEXT_DOMAIN ); ?></label></th>
+						<td>
+							<select id="product_status" name="product_status">
+								<option value="draft" <?php selected( $settings['product_status'], 'draft' ); ?>><?php esc_html_e( 'Draft', WTI_TEXT_DOMAIN ); ?></option>
+								<option value="publish" <?php selected( $settings['product_status'], 'publish' ); ?>><?php esc_html_e( 'Published', WTI_TEXT_DOMAIN ); ?></option>
+							</select>
+						</td>
+					</tr>
 				</table>
 
 				<?php submit_button( __( 'Save settings', WTI_TEXT_DOMAIN ) ); ?>
@@ -194,4 +222,3 @@ class WTI_Admin {
 		return isset( $messages[ $notice ] ) ? $messages[ $notice ] : '';
 	}
 }
-

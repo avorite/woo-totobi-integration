@@ -70,7 +70,9 @@ class WTI_Product_Sync {
 		$args = wp_parse_args(
 			$args,
 			array(
-				'dry_run' => true,
+				'dry_run'        => true,
+				'import_limit'   => 10,
+				'product_status' => 'draft',
 			)
 		);
 
@@ -82,7 +84,48 @@ class WTI_Product_Sync {
 			);
 		}
 
-		return new WP_Error( 'wti_product_write_not_implemented', 'Product write operations are not implemented yet.' );
+		if ( ! class_exists( 'WC_Product_Simple' ) ) {
+			return new WP_Error( 'wti_woocommerce_missing', 'WooCommerce product classes are not available.' );
+		}
+
+		$limit   = max( 1, absint( $args['import_limit'] ) );
+		$status  = in_array( $args['product_status'], array( 'draft', 'publish' ), true ) ? $args['product_status'] : 'draft';
+		$result  = array(
+			'status'           => 'written',
+			'processed'        => 0,
+			'created_simple'   => 0,
+			'updated_simple'   => 0,
+			'skipped_variable' => count( $actions['variable'] ),
+			'skipped_variation' => count( $actions['variations'] ),
+			'errors'           => array(),
+		);
+
+		foreach ( $actions['simple'] as $action ) {
+			if ( $result['processed'] >= $limit ) {
+				break;
+			}
+
+			$write = self::write_simple_product( $action, $status );
+
+			if ( is_wp_error( $write ) ) {
+				$result['errors'][] = array(
+					'action' => $action['action'],
+					'sku'    => $action['sku'],
+					'error'  => $write->get_error_message(),
+				);
+				continue;
+			}
+
+			$result['processed']++;
+
+			if ( 'create_simple' === $action['action'] ) {
+				$result['created_simple']++;
+			} else {
+				$result['updated_simple']++;
+			}
+		}
+
+		return $result;
 	}
 
 	private static function build_simple_action( $action, $product_id, $offer, $args ) {
@@ -96,8 +139,50 @@ class WTI_Product_Sync {
 			'price'       => $offer['price'],
 			'stock'       => $offer['quantity_in_stock'],
 			'stock_status' => $offer['stock_status'],
+			'description' => $offer['description'],
+			'params'      => $offer['params'],
+			'pictures'    => $offer['pictures'],
 			'meta'        => self::build_common_meta( $offer, $args ),
 		);
+	}
+
+	private static function write_simple_product( $action, $status ) {
+		try {
+			$product = ! empty( $action['product_id'] ) ? wc_get_product( $action['product_id'] ) : new WC_Product_Simple();
+
+			if ( ! $product || ! is_a( $product, 'WC_Product_Simple' ) ) {
+				$product = new WC_Product_Simple();
+			}
+
+			$product->set_name( wp_strip_all_tags( $action['name'] ) );
+			$product->set_status( $status );
+			$product->set_catalog_visibility( 'visible' );
+			$product->set_description( wp_kses_post( $action['description'] ) );
+			$product->set_regular_price( wc_format_decimal( $action['price'] ) );
+			$product->set_price( wc_format_decimal( $action['price'] ) );
+			$product->set_manage_stock( true );
+			$product->set_stock_quantity( max( 0, (int) $action['stock'] ) );
+			$product->set_stock_status( $action['stock_status'] );
+
+			if ( ! empty( $action['sku'] ) && $product->get_sku() !== $action['sku'] ) {
+				$product->set_sku( $action['sku'] );
+			}
+
+			foreach ( $action['meta'] as $key => $value ) {
+				$product->update_meta_data( $key, $value );
+			}
+
+			$product->update_meta_data( '_wti_params', wp_json_encode( $action['params'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+			$product->update_meta_data( '_wti_picture_urls', wp_json_encode( $action['pictures'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+
+			$product_id = $product->save();
+
+			return array(
+				'product_id' => $product_id,
+			);
+		} catch ( Exception $exception ) {
+			return new WP_Error( 'wti_simple_product_write_failed', $exception->getMessage() );
+		}
 	}
 
 	private static function build_variable_action( $action, $product_id, $variable, $args ) {
@@ -236,4 +321,3 @@ class WTI_Product_Sync {
 		return empty( $query->posts ) ? 0 : (int) $query->posts[0];
 	}
 }
-
