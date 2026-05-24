@@ -36,10 +36,30 @@ class WTI_Importer {
 			return $meta;
 		}
 
+		$offers = WTI_Parser::parse_offers(
+			$xml,
+			array(
+				'allowed_paths' => isset( $settings['selected_paths'] ) ? $settings['selected_paths'] : WTI_Parser::DEFAULT_ALLOWED_PATHS,
+			)
+		);
+
+		if ( is_wp_error( $offers ) ) {
+			WTI_Logger::log( 'Offer parse failed.', array( 'error' => $offers->get_error_message() ) );
+			self::save_last_result( $started, array( 'status' => 'error', 'message' => $offers->get_error_message() ) );
+
+			return $offers;
+		}
+
+		$plan    = WTI_Parser::build_import_plan( $offers );
+		$summary = WTI_Parser::summarize_plan( $plan );
+
 		$result = array(
 			'status'       => 'ok',
-			'message'      => 'Scaffold sync checked feed metadata. Product import is not implemented yet.',
+			'message'      => 'Dry-run parsed Totobi Prom YML. Product import is not implemented yet.',
 			'catalog_date' => isset( $meta['date'] ) ? $meta['date'] : '',
+			'offers'       => count( $offers ),
+			'plan'         => $summary,
+			'examples'     => self::build_examples( $plan ),
 			'created'      => 0,
 			'updated'      => 0,
 			'skipped'      => 0,
@@ -50,6 +70,49 @@ class WTI_Importer {
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
 
 		return $result;
+	}
+
+	private static function build_examples( $plan ) {
+		$examples = array(
+			'simple'   => array(),
+			'variable' => array(),
+		);
+
+		foreach ( array_slice( $plan['simple'], 0, 3 ) as $offer ) {
+			$examples['simple'][] = array(
+				'id'           => $offer['id'],
+				'name'         => $offer['name'],
+				'sku'          => $offer['sku'],
+				'vendor_code'  => $offer['vendor_code'],
+				'category_id'  => $offer['category_id'],
+				'price'        => $offer['price'],
+				'stock_status' => $offer['stock_status'],
+			);
+		}
+
+		foreach ( array_slice( $plan['variable'], 0, 3 ) as $variable ) {
+			$examples['variable'][] = array(
+				'group_id'         => $variable['group_id'],
+				'name'             => $variable['parent']['name'],
+				'category_id'      => $variable['parent']['category_id'],
+				'variation_count'  => count( $variable['variations'] ),
+				'variation_sample' => array_map(
+					function ( $offer ) {
+						return array(
+							'id'           => $offer['id'],
+							'sku'          => $offer['sku'],
+							'vendor_code'  => $offer['vendor_code'],
+							'size'         => $offer['size'],
+							'price'        => $offer['price'],
+							'stock_status' => $offer['stock_status'],
+						);
+					},
+					array_slice( $variable['variations'], 0, 5 )
+				),
+			);
+		}
+
+		return $examples;
 	}
 
 	private static function save_last_result( $started, $result ) {
@@ -66,4 +129,3 @@ class WTI_Importer {
 		);
 	}
 }
-
