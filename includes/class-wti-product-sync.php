@@ -33,6 +33,9 @@ class WTI_Product_Sync {
 				'update_variable'   => 0,
 				'create_variation'  => 0,
 				'update_variation'  => 0,
+				'skip_unchanged_simple' => 0,
+				'skip_unchanged_variable' => 0,
+				'skip_unchanged_variation' => 0,
 				'skipped'           => 0,
 			),
 		);
@@ -40,6 +43,10 @@ class WTI_Product_Sync {
 		foreach ( $plan['simple'] as $offer ) {
 			$existing_id = self::find_existing_simple_product_id( $offer );
 			$action      = $existing_id ? 'update_simple' : 'create_simple';
+
+			if ( $existing_id && self::is_offer_unchanged( $existing_id, $offer, $args ) ) {
+				$action = 'skip_unchanged_simple';
+			}
 
 			$actions['summary'][ $action ]++;
 			$actions['simple'][] = self::build_simple_action( $action, $existing_id, $offer, $args );
@@ -49,17 +56,31 @@ class WTI_Product_Sync {
 			$parent      = $variable['parent'];
 			$existing_id = self::find_existing_variable_product_id( $variable );
 			$action      = $existing_id ? 'update_variable' : 'create_variable';
+			$parent_unchanged = $existing_id && self::is_offer_unchanged( $existing_id, $parent, $args );
+			$has_changed_variations = false;
 
-			$actions['summary'][ $action ]++;
 			$variable_action = self::build_variable_action( $action, $existing_id, $variable, $args );
 
 			foreach ( $variable['variations'] as $variation ) {
 				$variation_id     = self::find_existing_variation_id( $variation, $existing_id );
 				$variation_action = $variation_id ? 'update_variation' : 'create_variation';
 
+				if ( $variation_id && self::is_offer_unchanged( $variation_id, $variation, array( 'import_images' => false ) ) ) {
+					$variation_action = 'skip_unchanged_variation';
+				} else {
+					$has_changed_variations = true;
+				}
+
 				$actions['summary'][ $variation_action ]++;
 				$actions['variations'][] = self::build_variation_action( $variation_action, $variation_id, $existing_id, $parent, $variation, $args );
 			}
+
+			if ( $parent_unchanged && ! $has_changed_variations ) {
+				$action = 'skip_unchanged_variable';
+				$variable_action['action'] = $action;
+			}
+
+			$actions['summary'][ $action ]++;
 
 			$actions['variable'][] = $variable_action;
 		}
@@ -119,6 +140,7 @@ class WTI_Product_Sync {
 			'updated_variable'   => 0,
 			'created_variation'  => 0,
 			'updated_variation'  => 0,
+			'skipped_unchanged'  => 0,
 			'skipped_simple'     => 0,
 			'skipped_variable'   => 0,
 			'skipped_variation'  => 0,
@@ -130,6 +152,12 @@ class WTI_Product_Sync {
 		);
 
 		foreach ( $simple_batch as $action ) {
+			if ( 'skip_unchanged_simple' === $action['action'] ) {
+				$result['processed']++;
+				$result['skipped_unchanged']++;
+				continue;
+			}
+
 			$write = self::write_simple_product( $action, $status, ! empty( $args['import_images'] ) );
 
 			if ( is_wp_error( $write ) ) {
@@ -155,6 +183,12 @@ class WTI_Product_Sync {
 		$variation_actions = self::index_variation_actions_by_group( $actions['variations'] );
 
 		foreach ( $variable_batch as $action ) {
+			if ( 'skip_unchanged_variable' === $action['action'] ) {
+				$result['processed']++;
+				$result['skipped_unchanged']++;
+				continue;
+			}
+
 			$write = self::write_variable_product( $action, $status, ! empty( $args['import_images'] ) );
 
 			if ( is_wp_error( $write ) ) {
@@ -179,6 +213,11 @@ class WTI_Product_Sync {
 			$group_variations = isset( $variation_actions[ $action['group_id'] ] ) ? $variation_actions[ $action['group_id'] ] : array();
 
 			foreach ( $group_variations as $variation_action ) {
+				if ( 'skip_unchanged_variation' === $variation_action['action'] ) {
+					$result['skipped_unchanged']++;
+					continue;
+				}
+
 				$variation_action['parent_id'] = $write['product_id'];
 				$variation_write               = self::write_variation( $variation_action );
 
@@ -413,6 +452,31 @@ class WTI_Product_Sync {
 			self::META_RAW_HASH     => $offer['raw_hash'],
 			self::META_CATALOG_DATE => isset( $args['catalog_date'] ) ? $args['catalog_date'] : '',
 		);
+	}
+
+	private static function is_offer_unchanged( $product_id, $offer, $args ) {
+		if ( ! $product_id || empty( $offer['raw_hash'] ) ) {
+			return false;
+		}
+
+		$current_hash = (string) get_post_meta( $product_id, self::META_RAW_HASH, true );
+
+		if ( $current_hash !== (string) $offer['raw_hash'] ) {
+			return false;
+		}
+
+		if ( empty( $args['import_images'] ) ) {
+			return true;
+		}
+
+		if ( ! class_exists( 'WTI_Image_Sync' ) ) {
+			return false;
+		}
+
+		$current_image_set = (string) get_post_meta( $product_id, WTI_Image_Sync::META_IMAGE_SET_HASH, true );
+		$expected_image_set = WTI_Image_Sync::build_image_set_hash_from_urls( isset( $offer['pictures'] ) ? $offer['pictures'] : array() );
+
+		return '' !== $current_image_set && $current_image_set === $expected_image_set;
 	}
 
 	private static function resolve_woo_category_ids( $offer, $args ) {

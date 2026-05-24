@@ -124,6 +124,7 @@
 		$('#wti-stat-created-variation').text(data.created_variation || 0);
 		$('#wti-stat-updated-variation').text(data.updated_variation || 0);
 		$('#wti-stat-images').text(data.imported_images || 0);
+		$('#wti-stat-skipped').text(data.skipped_unchanged || 0);
 		$('#wti-stat-errors').text(data.errors || 0);
 	}
 

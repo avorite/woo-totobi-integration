@@ -11,11 +11,11 @@ class WTI_Admin {
 			'markup_percent'  => '0',
 			'sync_time'       => '17:00',
 			'sync_interval'   => WTI_Scheduler::SCHEDULE_FOUR_HOURS,
-			'dry_run'         => 'yes',
-			'import_limit'    => 10,
-			'variable_limit'  => 1,
-			'import_images'   => 'no',
-			'product_status'  => 'draft',
+			'dry_run'         => 'no',
+			'import_limit'    => 50,
+			'variable_limit'  => 8,
+			'import_images'   => 'yes',
+			'product_status'  => 'publish',
 			'selected_paths'  => self::get_default_totobi_paths(),
 			'category_map'    => array(),
 		);
@@ -120,11 +120,11 @@ class WTI_Admin {
 			'markup_percent' => isset( $_POST['markup_percent'] ) ? sanitize_text_field( wp_unslash( $_POST['markup_percent'] ) ) : '0',
 			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '17:00',
 			'sync_interval'  => isset( $_POST['sync_interval'] ) && in_array( $_POST['sync_interval'], array( WTI_Scheduler::SCHEDULE_FOUR_HOURS, WTI_Scheduler::SCHEDULE_SIX_HOURS, 'daily' ), true ) ? sanitize_key( wp_unslash( $_POST['sync_interval'] ) ) : WTI_Scheduler::SCHEDULE_FOUR_HOURS,
-			'dry_run'        => empty( $_POST['dry_run'] ) ? 'no' : 'yes',
-			'import_limit'   => isset( $_POST['import_limit'] ) ? max( 1, absint( wp_unslash( $_POST['import_limit'] ) ) ) : 10,
-			'variable_limit' => isset( $_POST['variable_limit'] ) ? max( 0, absint( wp_unslash( $_POST['variable_limit'] ) ) ) : 1,
-			'import_images'  => empty( $_POST['import_images'] ) ? 'no' : 'yes',
-			'product_status' => isset( $_POST['product_status'] ) && in_array( $_POST['product_status'], array( 'draft', 'publish' ), true ) ? sanitize_key( wp_unslash( $_POST['product_status'] ) ) : 'draft',
+			'dry_run'        => 'no',
+			'import_limit'   => 50,
+			'variable_limit' => 8,
+			'import_images'  => 'yes',
+			'product_status' => 'publish',
 			'selected_paths' => $paths ? $paths : self::get_default_totobi_paths(),
 			'category_map'   => self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ),
 		);
@@ -216,39 +216,9 @@ class WTI_Admin {
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><?php esc_html_e( 'Write mode', WTI_TEXT_DOMAIN ); ?></th>
+						<th scope="row"><?php esc_html_e( 'Product update mode', WTI_TEXT_DOMAIN ); ?></th>
 						<td>
-							<label><input type="checkbox" name="dry_run" value="yes" <?php checked( $settings['dry_run'], 'yes' ); ?>> <?php esc_html_e( 'Preview only, do not write product changes', WTI_TEXT_DOMAIN ); ?></label>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="import_limit"><?php esc_html_e( 'Simple product batch size', WTI_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<input type="number" min="1" max="100" id="import_limit" name="import_limit" value="<?php echo esc_attr( $settings['import_limit'] ); ?>">
-							<p class="description"><?php esc_html_e( 'Number of simple products processed per AJAX request. This is not a total import limit.', WTI_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="variable_limit"><?php esc_html_e( 'Variable product batch size', WTI_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<input type="number" min="0" max="20" id="variable_limit" name="variable_limit" value="<?php echo esc_attr( $settings['variable_limit'] ); ?>">
-							<p class="description"><?php esc_html_e( 'Number of variable parent products processed per AJAX request. All valid variations for those parents are processed in the same batch.', WTI_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Images', WTI_TEXT_DOMAIN ); ?></th>
-						<td>
-							<label><input type="checkbox" name="import_images" value="yes" <?php checked( $settings['import_images'], 'yes' ); ?>> <?php esc_html_e( 'Import product images from Totobi', WTI_TEXT_DOMAIN ); ?></label>
-							<p class="description"><?php esc_html_e( 'Uses Totobi picture tags: the first image becomes the featured image, the rest go to the gallery. Existing imported images are reused by source URL hash.', WTI_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="product_status"><?php esc_html_e( 'Created product status', WTI_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<select id="product_status" name="product_status">
-								<option value="draft" <?php selected( $settings['product_status'], 'draft' ); ?>><?php esc_html_e( 'Draft', WTI_TEXT_DOMAIN ); ?></option>
-								<option value="publish" <?php selected( $settings['product_status'], 'publish' ); ?>><?php esc_html_e( 'Published', WTI_TEXT_DOMAIN ); ?></option>
-							</select>
+							<p><?php esc_html_e( 'Products are published automatically. Images are imported from Totobi and unchanged products are skipped.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -287,8 +257,9 @@ class WTI_Admin {
 					<div><span id="wti-stat-updated-simple">0</span><small><?php esc_html_e( 'simple updated', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-updated-variable">0</span><small><?php esc_html_e( 'variable updated', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-updated-variation">0</span><small><?php esc_html_e( 'variations updated', WTI_TEXT_DOMAIN ); ?></small></div>
-					<div><span id="wti-stat-images">0</span><small><?php esc_html_e( 'images downloaded', WTI_TEXT_DOMAIN ); ?></small></div>
-					<div><span id="wti-stat-errors">0</span><small><?php esc_html_e( 'errors', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><span id="wti-stat-images">0</span><small><?php esc_html_e( 'images downloaded', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><span id="wti-stat-skipped">0</span><small><?php esc_html_e( 'unchanged skipped', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><span id="wti-stat-errors">0</span><small><?php esc_html_e( 'errors', WTI_TEXT_DOMAIN ); ?></small></div>
 				</div>
 				<div id="wti-log-output" class="wti-log-list"></div>
 			</div>

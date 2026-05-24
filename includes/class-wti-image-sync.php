@@ -224,6 +224,10 @@ class WTI_Image_Sync {
 		return $desired;
 	}
 
+	public static function build_image_set_hash_from_urls( $image_urls ) {
+		return self::build_image_set_hash( self::build_desired_image_set( (array) $image_urls ) );
+	}
+
 	private static function get_current_product_image_ids( $product ) {
 		$ids = array();
 
