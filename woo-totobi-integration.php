@@ -56,4 +56,5 @@ add_action( 'wp_ajax_wti_process_batch', array( 'WTI_Importer', 'handle_ajax_bat
 add_action( 'wp_ajax_wti_get_progress', array( 'WTI_Importer', 'handle_ajax_progress' ) );
 add_action( 'wp_ajax_wti_pause_import', array( 'WTI_Importer', 'handle_ajax_pause' ) );
 add_action( 'wp_ajax_wti_resume_import', array( 'WTI_Importer', 'handle_ajax_resume' ) );
+add_action( 'wp_ajax_wti_reset_import', array( 'WTI_Importer', 'handle_ajax_reset' ) );
 add_action( WTI_CRON_HOOK, array( 'WTI_Importer', 'run_scheduled_sync' ) );

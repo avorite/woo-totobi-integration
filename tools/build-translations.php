@@ -36,6 +36,7 @@ $translations = array(
 		'Start sync' => 'Запустить синхронизацию',
 		'Pause' => 'Пауза',
 		'Resume' => 'Продолжить',
+		'Reset stuck sync' => 'Сбросить зависшую синхронизацию',
 		'Waiting to start' => 'Ожидание запуска',
 		'processed' => 'обработано',
 		'simple updated' => 'простых обновлено',
@@ -93,6 +94,8 @@ $translations = array(
 		'variable products' => 'вариативные товары',
 		'missing products' => 'отсутствующие товары',
 		'Processing %stage%: %processed% of %total%' => 'Обработка: %stage%, %processed% из %total%',
+		'Reset the current sync session?' => 'Сбросить текущую сессию синхронизации?',
+		'Sync session reset.' => 'Сессия синхронизации сброшена.',
 	),
 	'uk' => array(
 		'Totobi Integration' => 'Інтеграція Totobi',
@@ -125,6 +128,7 @@ $translations = array(
 		'Start sync' => 'Запустити синхронізацію',
 		'Pause' => 'Пауза',
 		'Resume' => 'Продовжити',
+		'Reset stuck sync' => 'Скинути завислу синхронізацію',
 		'Waiting to start' => 'Очікування запуску',
 		'processed' => 'оброблено',
 		'simple updated' => 'простих оновлено',
@@ -182,6 +186,8 @@ $translations = array(
 		'variable products' => 'варіативні товари',
 		'missing products' => 'відсутні товари',
 		'Processing %stage%: %processed% of %total%' => 'Обробка: %stage%, %processed% із %total%',
+		'Reset the current sync session?' => 'Скинути поточну сесію синхронізації?',
+		'Sync session reset.' => 'Сесію синхронізації скинуто.',
 	),
 );
 

@@ -245,6 +245,7 @@ class WTI_Importer {
 
 	public static function handle_ajax_batch() {
 		self::check_ajax_request();
+		self::refresh_import_lock();
 
 		$plan = get_transient( self::IMPORT_PLAN_TRANSIENT );
 		if ( ! is_array( $plan ) ) {
@@ -358,7 +359,16 @@ class WTI_Importer {
 		$session           = get_option( self::IMPORT_SESSION_OPTION, array() );
 		$session['status'] = 'running';
 		update_option( self::IMPORT_SESSION_OPTION, $session, false );
+		self::refresh_import_lock();
 		wp_send_json_success( self::session_response( $session ) );
+	}
+
+	public static function handle_ajax_reset() {
+		self::check_ajax_request();
+		delete_transient( self::IMPORT_PLAN_TRANSIENT );
+		delete_option( self::IMPORT_SESSION_OPTION );
+		self::release_import_lock();
+		wp_send_json_success( array( 'reset' => true ) );
 	}
 
 	private static function check_ajax_request() {
@@ -582,6 +592,14 @@ class WTI_Importer {
 		if ( $lock ) {
 			$session = get_option( self::IMPORT_SESSION_OPTION, array() );
 			$status  = isset( $session['status'] ) ? (string) $session['status'] : '';
+			$age     = time() - absint( $lock );
+
+			if ( $age > 15 * MINUTE_IN_SECONDS ) {
+				self::release_import_lock();
+				delete_transient( self::IMPORT_PLAN_TRANSIENT );
+				delete_option( self::IMPORT_SESSION_OPTION );
+				$status = '';
+			}
 
 			if ( in_array( $status, array( 'running', 'paused' ), true ) ) {
 				return false;
@@ -593,6 +611,10 @@ class WTI_Importer {
 		set_transient( self::IMPORT_LOCK_TRANSIENT, time(), 3 * HOUR_IN_SECONDS );
 
 		return true;
+	}
+
+	private static function refresh_import_lock() {
+		set_transient( self::IMPORT_LOCK_TRANSIENT, time(), 30 * MINUTE_IN_SECONDS );
 	}
 
 	private static function release_import_lock() {

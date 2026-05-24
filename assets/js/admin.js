@@ -120,6 +120,23 @@
 		}).always(processBatch);
 	}
 
+	function resetImport() {
+		if (!window.confirm(t('resetConfirm', 'Reset the current sync session?'))) {
+			return;
+		}
+
+		$.post(wtiAdmin.ajaxUrl, {
+			action: 'wti_reset_import',
+			_wpnonce: wtiAdmin.nonce
+		}).always(function () {
+			resetUi();
+			$('#wti-log-output').text('');
+			updateProgress({ total: 0, processed: 0 });
+			updateStatus(t('resetDone', 'Sync session reset.'));
+			addLog(t('resetDone', 'Sync session reset.'));
+		});
+	}
+
 	function updateProgress(data) {
 		var total = parseInt(data.total || 0, 10);
 		var processed = parseInt(data.processed || 0, 10);
@@ -183,6 +200,7 @@
 		$('#wti-start-import').on('click', startImport);
 		$('#wti-pause-import').on('click', pauseImport);
 		$('#wti-resume-import').on('click', resumeImport);
+		$('#wti-reset-import').on('click', resetImport);
 		$('input[name="category_mode"]').on('change', updateCategoryModeControls);
 		updateCategoryModeControls();
 	});

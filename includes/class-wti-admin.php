@@ -103,6 +103,8 @@ class WTI_Admin {
 					'variableProducts'=> __( 'variable products', WTI_TEXT_DOMAIN ),
 					'deletedProducts' => __( 'missing products', WTI_TEXT_DOMAIN ),
 					'processingStage' => __( 'Processing %stage%: %processed% of %total%', WTI_TEXT_DOMAIN ),
+					'resetConfirm'    => __( 'Reset the current sync session?', WTI_TEXT_DOMAIN ),
+					'resetDone'       => __( 'Sync session reset.', WTI_TEXT_DOMAIN ),
 				),
 			)
 		);
@@ -295,6 +297,7 @@ class WTI_Admin {
 					<button type="button" class="button button-primary" id="wti-start-import"><?php esc_html_e( 'Start sync', WTI_TEXT_DOMAIN ); ?></button>
 					<button type="button" class="button" id="wti-pause-import" style="display:none;"><?php esc_html_e( 'Pause', WTI_TEXT_DOMAIN ); ?></button>
 					<button type="button" class="button" id="wti-resume-import" style="display:none;"><?php esc_html_e( 'Resume', WTI_TEXT_DOMAIN ); ?></button>
+					<button type="button" class="button" id="wti-reset-import"><?php esc_html_e( 'Reset stuck sync', WTI_TEXT_DOMAIN ); ?></button>
 				</div>
 			</div>
 			<div id="wti-progress-wrap" class="wti-progress-wrap" style="display:none;">

@@ -94,6 +94,9 @@ msgstr "Пауза"
 msgid "Resume"
 msgstr "Продовжити"
 
+msgid "Reset stuck sync"
+msgstr "Скинути завислу синхронізацію"
+
 msgid "Waiting to start"
 msgstr "Очікування запуску"
 
@@ -264,4 +267,10 @@ msgstr "відсутні товари"
 
 msgid "Processing %stage%: %processed% of %total%"
 msgstr "Обробка: %stage%, %processed% із %total%"
+
+msgid "Reset the current sync session?"
+msgstr "Скинути поточну сесію синхронізації?"
+
+msgid "Sync session reset."
+msgstr "Сесію синхронізації скинуто."
 
