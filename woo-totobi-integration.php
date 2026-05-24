@@ -42,6 +42,7 @@ function wti_load_textdomain() {
 	load_plugin_textdomain( WTI_TEXT_DOMAIN, false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 }
 add_action( 'init', 'wti_load_textdomain' );
+add_filter( 'cron_schedules', array( 'WTI_Scheduler', 'add_cron_schedules' ) );
 
 register_activation_hook( __FILE__, array( 'WTI_Scheduler', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'WTI_Scheduler', 'deactivate' ) );

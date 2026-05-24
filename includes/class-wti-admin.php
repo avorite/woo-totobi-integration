@@ -9,7 +9,8 @@ class WTI_Admin {
 			'main_feed_url'   => WTI_Feed_Client::DEFAULT_MAIN_FEED_URL,
 			'category_mode'   => 'auto',
 			'markup_percent'  => '0',
-			'sync_time'       => '15:00',
+			'sync_time'       => '17:00',
+			'sync_interval'   => WTI_Scheduler::SCHEDULE_FOUR_HOURS,
 			'dry_run'         => 'yes',
 			'import_limit'    => 10,
 			'variable_limit'  => 1,
@@ -113,7 +114,8 @@ class WTI_Admin {
 			'main_feed_url'  => isset( $_POST['main_feed_url'] ) ? esc_url_raw( wp_unslash( $_POST['main_feed_url'] ) ) : WTI_Feed_Client::DEFAULT_MAIN_FEED_URL,
 			'category_mode'  => isset( $_POST['category_mode'] ) && 'manual' === $_POST['category_mode'] ? 'manual' : 'auto',
 			'markup_percent' => isset( $_POST['markup_percent'] ) ? sanitize_text_field( wp_unslash( $_POST['markup_percent'] ) ) : '0',
-			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '15:00',
+			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '17:00',
+			'sync_interval'  => isset( $_POST['sync_interval'] ) && in_array( $_POST['sync_interval'], array( WTI_Scheduler::SCHEDULE_FOUR_HOURS, WTI_Scheduler::SCHEDULE_SIX_HOURS, 'daily' ), true ) ? sanitize_key( wp_unslash( $_POST['sync_interval'] ) ) : WTI_Scheduler::SCHEDULE_FOUR_HOURS,
 			'dry_run'        => empty( $_POST['dry_run'] ) ? 'no' : 'yes',
 			'import_limit'   => isset( $_POST['import_limit'] ) ? max( 1, absint( wp_unslash( $_POST['import_limit'] ) ) ) : 10,
 			'variable_limit' => isset( $_POST['variable_limit'] ) ? max( 0, absint( wp_unslash( $_POST['variable_limit'] ) ) ) : 1,
@@ -194,6 +196,17 @@ class WTI_Admin {
 						<td>
 							<input type="time" id="sync_time" name="sync_time" value="<?php echo esc_attr( $settings['sync_time'] ); ?>">
 							<p class="description"><?php echo esc_html( $next_run ? sprintf( __( 'Next run: %s', WTI_TEXT_DOMAIN ), wp_date( 'Y-m-d H:i:s', $next_run ) ) : __( 'Not scheduled yet.', WTI_TEXT_DOMAIN ) ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="sync_interval"><?php esc_html_e( 'Sync interval', WTI_TEXT_DOMAIN ); ?></label></th>
+						<td>
+							<select id="sync_interval" name="sync_interval">
+								<option value="<?php echo esc_attr( WTI_Scheduler::SCHEDULE_FOUR_HOURS ); ?>" <?php selected( $settings['sync_interval'], WTI_Scheduler::SCHEDULE_FOUR_HOURS ); ?>><?php esc_html_e( 'Every 4 hours', WTI_TEXT_DOMAIN ); ?></option>
+								<option value="<?php echo esc_attr( WTI_Scheduler::SCHEDULE_SIX_HOURS ); ?>" <?php selected( $settings['sync_interval'], WTI_Scheduler::SCHEDULE_SIX_HOURS ); ?>><?php esc_html_e( 'Every 6 hours', WTI_TEXT_DOMAIN ); ?></option>
+								<option value="daily" <?php selected( $settings['sync_interval'], 'daily' ); ?>><?php esc_html_e( 'Daily', WTI_TEXT_DOMAIN ); ?></option>
+							</select>
+							<p class="description"><?php esc_html_e( 'Prom YML observations showed 12:00 -> 16:00, so every 4 hours is the default. Unchanged catalog dates are skipped.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 					<tr>

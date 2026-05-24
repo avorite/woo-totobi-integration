@@ -36,6 +36,22 @@ class WTI_Importer {
 			return $meta;
 		}
 
+		$catalog_date      = isset( $meta['date'] ) ? $meta['date'] : '';
+		$last_catalog_date = (string) get_option( 'wti_last_catalog_date', '' );
+
+		if ( empty( $args['manual'] ) && '' !== $catalog_date && $catalog_date === $last_catalog_date ) {
+			$result = array(
+				'status'       => 'skipped',
+				'message'      => 'Catalog date is unchanged; scheduled sync skipped.',
+				'catalog_date' => $catalog_date,
+			);
+
+			self::save_last_result( $started, $result );
+			WTI_Logger::log( 'Scheduled sync skipped because catalog date is unchanged.', $result );
+
+			return $result;
+		}
+
 		$offers = WTI_Parser::parse_offers(
 			$xml,
 			array(
@@ -56,7 +72,7 @@ class WTI_Importer {
 			$plan,
 			array(
 				'dry_run'      => 'yes' === $settings['dry_run'],
-				'catalog_date' => isset( $meta['date'] ) ? $meta['date'] : '',
+				'catalog_date' => $catalog_date,
 				'category_map' => isset( $settings['category_map'] ) ? $settings['category_map'] : array(),
 			)
 		);
@@ -74,7 +90,7 @@ class WTI_Importer {
 		$result = array(
 			'status'       => 'ok',
 			'message'      => 'Dry-run parsed Totobi Prom YML. Product import is not implemented yet.',
-			'catalog_date' => isset( $meta['date'] ) ? $meta['date'] : '',
+			'catalog_date' => $catalog_date,
 			'offers'       => count( $offers ),
 			'plan'         => $summary,
 			'actions'      => self::build_action_summary( $actions ),
@@ -88,6 +104,7 @@ class WTI_Importer {
 		);
 
 		self::save_last_result( $started, $result );
+		self::save_last_catalog_date( $catalog_date );
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
 
 		return $result;
@@ -168,5 +185,11 @@ class WTI_Importer {
 			),
 			false
 		);
+	}
+
+	private static function save_last_catalog_date( $catalog_date ) {
+		if ( '' !== (string) $catalog_date ) {
+			update_option( 'wti_last_catalog_date', (string) $catalog_date, false );
+		}
 	}
 }
