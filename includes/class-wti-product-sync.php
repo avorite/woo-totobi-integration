@@ -123,6 +123,8 @@ class WTI_Product_Sync {
 			'skipped_variable'   => 0,
 			'skipped_variation'  => 0,
 			'imported_images'    => 0,
+			'reused_images'      => 0,
+			'skipped_images'     => 0,
 			'image_errors'       => array(),
 			'errors'             => array(),
 		);
@@ -353,13 +355,9 @@ class WTI_Product_Sync {
 			return;
 		}
 
-		if ( ! empty( $write['image_result']['featured_id'] ) ) {
-			$result['imported_images']++;
-		}
-
-		if ( ! empty( $write['image_result']['gallery_ids'] ) ) {
-			$result['imported_images'] += count( $write['image_result']['gallery_ids'] );
-		}
+		$result['imported_images'] += isset( $write['image_result']['imported_count'] ) ? (int) $write['image_result']['imported_count'] : 0;
+		$result['reused_images']   += isset( $write['image_result']['reused_count'] ) ? (int) $write['image_result']['reused_count'] : 0;
+		$result['skipped_images']  += isset( $write['image_result']['skipped_count'] ) ? (int) $write['image_result']['skipped_count'] : 0;
 
 		if ( ! empty( $write['image_result']['errors'] ) ) {
 			$result['image_errors'] = array_merge( $result['image_errors'], $write['image_result']['errors'] );

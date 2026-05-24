@@ -198,6 +198,8 @@ class WTI_Importer {
 			'created_variation'   => 0,
 			'updated_variation'   => 0,
 			'imported_images'     => 0,
+			'reused_images'       => 0,
+			'skipped_images'      => 0,
 			'errors'              => 0,
 			'error_samples'       => array(),
 			'plan'                => $summary,
@@ -318,7 +320,7 @@ class WTI_Importer {
 	}
 
 	private static function merge_execution_into_session( &$session, $execution ) {
-		foreach ( array( 'created_simple', 'updated_simple', 'created_variable', 'updated_variable', 'created_variation', 'updated_variation', 'imported_images' ) as $key ) {
+		foreach ( array( 'created_simple', 'updated_simple', 'created_variable', 'updated_variable', 'created_variation', 'updated_variation', 'imported_images', 'reused_images', 'skipped_images' ) as $key ) {
 			$session[ $key ] = isset( $session[ $key ] ) ? (int) $session[ $key ] : 0;
 			$session[ $key ] += isset( $execution[ $key ] ) ? (int) $execution[ $key ] : 0;
 		}
@@ -392,6 +394,8 @@ class WTI_Importer {
 			'created_variation'  => isset( $session['created_variation'] ) ? (int) $session['created_variation'] : 0,
 			'updated_variation'  => isset( $session['updated_variation'] ) ? (int) $session['updated_variation'] : 0,
 			'imported_images'    => isset( $session['imported_images'] ) ? (int) $session['imported_images'] : 0,
+			'reused_images'      => isset( $session['reused_images'] ) ? (int) $session['reused_images'] : 0,
+			'skipped_images'     => isset( $session['skipped_images'] ) ? (int) $session['skipped_images'] : 0,
 			'errors'             => isset( $session['errors'] ) ? (int) $session['errors'] : 0,
 			'error_samples'      => isset( $session['error_samples'] ) ? $session['error_samples'] : array(),
 			'catalog_date'       => isset( $session['catalog_date'] ) ? $session['catalog_date'] : '',
