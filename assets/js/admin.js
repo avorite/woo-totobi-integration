@@ -137,6 +137,7 @@
 		$('#wti-stat-updated-variation').text(data.updated_variation || 0);
 		$('#wti-stat-images').text(data.imported_images || 0);
 		$('#wti-stat-skipped').text(data.skipped_unchanged || 0);
+		$('#wti-stat-deleted').text(data.deleted_outofstock || 0);
 		$('#wti-stat-errors').text(data.errors || 0);
 	}
 
@@ -155,7 +156,7 @@
 	}
 
 	function statusText(data) {
-		var stage = data.stage === 'variable' ? t('variableProducts', 'variable products') : t('simpleProducts', 'simple products');
+		var stage = data.stage === 'deleted' ? t('deletedProducts', 'missing products') : (data.stage === 'variable' ? t('variableProducts', 'variable products') : t('simpleProducts', 'simple products'));
 		return t('processingStage', 'Processing %stage%: %processed% of %total%', {
 			stage: stage,
 			processed: data.processed || 0,

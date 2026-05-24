@@ -109,6 +109,9 @@ msgstr "зображень завантажено"
 msgid "unchanged skipped"
 msgstr "незмінених пропущено"
 
+msgid "missing set out of stock"
+msgstr "відсутніх немає в наявності"
+
 msgid "errors"
 msgstr "помилок"
 
@@ -141,6 +144,9 @@ msgstr "Оновлено"
 
 msgid "Unchanged"
 msgstr "Без змін"
+
+msgid "Out of stock"
+msgstr "Немає в наявності"
 
 msgid "Images"
 msgstr "Зображення"
@@ -246,6 +252,9 @@ msgstr "прості товари"
 
 msgid "variable products"
 msgstr "варіативні товари"
+
+msgid "missing products"
+msgstr "відсутні товари"
 
 msgid "Processing %stage%: %processed% of %total%"
 msgstr "Обробка: %stage%, %processed% із %total%"

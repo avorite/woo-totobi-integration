@@ -26,6 +26,7 @@ class WTI_Product_Sync {
 			'simple'     => array(),
 			'variable'   => array(),
 			'variations' => array(),
+			'deleted'    => array(),
 			'summary'    => array(
 				'create_simple'     => 0,
 				'update_simple'     => 0,
@@ -33,6 +34,7 @@ class WTI_Product_Sync {
 				'update_variable'   => 0,
 				'create_variation'  => 0,
 				'update_variation'  => 0,
+				'mark_deleted_outofstock' => 0,
 				'skip_unchanged_simple' => 0,
 				'skip_unchanged_variable' => 0,
 				'skip_unchanged_variation' => 0,
@@ -85,6 +87,19 @@ class WTI_Product_Sync {
 			$actions['variable'][] = $variable_action;
 		}
 
+		foreach ( isset( $plan['deleted'] ) && is_array( $plan['deleted'] ) ? $plan['deleted'] : array() as $deleted ) {
+			if ( empty( $deleted['product_id'] ) ) {
+				continue;
+			}
+
+			$actions['summary']['mark_deleted_outofstock']++;
+			$actions['deleted'][] = array(
+				'action'     => 'mark_deleted_outofstock',
+				'product_id' => absint( $deleted['product_id'] ),
+				'offer_id'   => isset( $deleted['offer_id'] ) ? (string) $deleted['offer_id'] : '',
+			);
+		}
+
 		return $actions;
 	}
 
@@ -95,8 +110,10 @@ class WTI_Product_Sync {
 				'dry_run'        => true,
 				'import_limit'   => 10,
 				'variable_limit' => 1,
+				'deleted_limit'  => 50,
 				'simple_offset'  => 0,
 				'variable_offset' => 0,
+				'deleted_offset' => 0,
 				'import_images'  => false,
 				'product_status' => 'draft',
 			)
@@ -116,24 +133,32 @@ class WTI_Product_Sync {
 
 		$simple_limit   = max( 0, absint( $args['import_limit'] ) );
 		$variable_limit = max( 0, absint( $args['variable_limit'] ) );
+		$deleted_limit  = max( 0, absint( $args['deleted_limit'] ) );
 		$simple_offset  = max( 0, absint( $args['simple_offset'] ) );
 		$variable_offset = max( 0, absint( $args['variable_offset'] ) );
+		$deleted_offset = max( 0, absint( $args['deleted_offset'] ) );
 		$simple_total   = count( $actions['simple'] );
 		$variable_total = count( $actions['variable'] );
+		$deleted_total  = isset( $actions['deleted'] ) ? count( $actions['deleted'] ) : 0;
 		$simple_batch   = $simple_limit > 0 ? array_slice( $actions['simple'], $simple_offset, $simple_limit ) : array();
 		$variable_batch = $variable_limit > 0 ? array_slice( $actions['variable'], $variable_offset, $variable_limit ) : array();
+		$deleted_batch  = $deleted_limit > 0 && ! empty( $actions['deleted'] ) ? array_slice( $actions['deleted'], $deleted_offset, $deleted_limit ) : array();
 		$status         = in_array( $args['product_status'], array( 'draft', 'publish' ), true ) ? $args['product_status'] : 'draft';
 		$result         = array(
 			'status'             => 'written',
 			'processed'          => 0,
 			'simple_total'       => $simple_total,
 			'variable_total'     => $variable_total,
+			'deleted_total'      => $deleted_total,
 			'simple_offset'      => $simple_offset,
 			'variable_offset'    => $variable_offset,
+			'deleted_offset'     => $deleted_offset,
 			'next_simple_offset' => min( $simple_total, $simple_offset + count( $simple_batch ) ),
 			'next_variable_offset' => min( $variable_total, $variable_offset + count( $variable_batch ) ),
+			'next_deleted_offset' => min( $deleted_total, $deleted_offset + count( $deleted_batch ) ),
 			'simple_complete'    => $simple_offset + count( $simple_batch ) >= $simple_total,
 			'variable_complete'  => $variable_offset + count( $variable_batch ) >= $variable_total,
+			'deleted_complete'   => $deleted_offset + count( $deleted_batch ) >= $deleted_total,
 			'created_simple'     => 0,
 			'updated_simple'     => 0,
 			'created_variable'   => 0,
@@ -144,6 +169,7 @@ class WTI_Product_Sync {
 			'skipped_simple'     => 0,
 			'skipped_variable'   => 0,
 			'skipped_variation'  => 0,
+			'deleted_outofstock' => 0,
 			'imported_images'    => 0,
 			'reused_images'      => 0,
 			'skipped_images'     => 0,
@@ -236,6 +262,22 @@ class WTI_Product_Sync {
 					$result['updated_variation']++;
 				}
 			}
+		}
+
+		foreach ( $deleted_batch as $action ) {
+			$deleted = self::mark_product_outofstock( $action['product_id'] );
+
+			if ( is_wp_error( $deleted ) ) {
+				$result['errors'][] = array(
+					'action' => $action['action'],
+					'sku'    => $action['offer_id'],
+					'error'  => $deleted->get_error_message(),
+				);
+				continue;
+			}
+
+			$result['processed']++;
+			$result['deleted_outofstock']++;
 		}
 
 		$result['skipped_simple']    = max( 0, $simple_total - $result['next_simple_offset'] );
@@ -400,6 +442,26 @@ class WTI_Product_Sync {
 
 		if ( ! empty( $write['image_result']['errors'] ) ) {
 			$result['image_errors'] = array_merge( $result['image_errors'], $write['image_result']['errors'] );
+		}
+	}
+
+	private static function mark_product_outofstock( $product_id ) {
+		try {
+			$product = wc_get_product( absint( $product_id ) );
+
+			if ( ! $product ) {
+				return new WP_Error( 'wti_missing_deleted_product', 'Product not found.' );
+			}
+
+			$product->set_manage_stock( true );
+			$product->set_stock_quantity( 0 );
+			$product->set_stock_status( 'outofstock' );
+			$product->update_meta_data( '_wti_missing_from_feed', current_time( 'mysql' ) );
+			$product->save();
+
+			return true;
+		} catch ( Exception $exception ) {
+			return new WP_Error( 'wti_deleted_product_update_failed', $exception->getMessage() );
 		}
 	}
 

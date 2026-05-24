@@ -29,6 +29,7 @@ $wti_includes = array(
 	'includes/class-wti-parser.php',
 	'includes/class-wti-image-sync.php',
 	'includes/class-wti-product-sync.php',
+	'includes/class-wti-feed-index.php',
 	'includes/class-wti-importer.php',
 	'includes/class-wti-scheduler.php',
 	'includes/class-wti-admin.php',

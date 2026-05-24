@@ -101,6 +101,7 @@ class WTI_Admin {
 					'resumedStatus'   => __( 'Sync resumed. Processing next batch...', WTI_TEXT_DOMAIN ),
 					'simpleProducts'  => __( 'simple products', WTI_TEXT_DOMAIN ),
 					'variableProducts'=> __( 'variable products', WTI_TEXT_DOMAIN ),
+					'deletedProducts' => __( 'missing products', WTI_TEXT_DOMAIN ),
 					'processingStage' => __( 'Processing %stage%: %processed% of %total%', WTI_TEXT_DOMAIN ),
 				),
 			)
@@ -297,6 +298,7 @@ class WTI_Admin {
 					<div><span id="wti-stat-updated-variation">0</span><small><?php esc_html_e( 'variations updated', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-images">0</span><small><?php esc_html_e( 'images downloaded', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-skipped">0</span><small><?php esc_html_e( 'unchanged skipped', WTI_TEXT_DOMAIN ); ?></small></div>
+					<div><span id="wti-stat-deleted">0</span><small><?php esc_html_e( 'missing set out of stock', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-errors">0</span><small><?php esc_html_e( 'errors', WTI_TEXT_DOMAIN ); ?></small></div>
 				</div>
 				<div id="wti-log-output" class="wti-log-list"></div>
@@ -312,6 +314,7 @@ class WTI_Admin {
 		$errors    = isset( $last_result['errors'] ) ? (int) $last_result['errors'] : 0;
 		$created   = isset( $last_result['created'] ) ? (int) $last_result['created'] : 0;
 		$skipped   = isset( $execution['skipped_unchanged'] ) ? (int) $execution['skipped_unchanged'] : 0;
+		$deleted   = isset( $execution['deleted_outofstock'] ) ? (int) $execution['deleted_outofstock'] : 0;
 		?>
 		<div class="wti-summary">
 			<div><span class="<?php echo esc_attr( self::status_badge_class( $status ) ); ?>"><?php echo esc_html( self::status_label( $status ) ); ?></span><small><?php esc_html_e( 'Status', WTI_TEXT_DOMAIN ); ?></small></div>
@@ -320,6 +323,7 @@ class WTI_Admin {
 			<div><strong><?php echo esc_html( $created ); ?></strong><small><?php esc_html_e( 'Created', WTI_TEXT_DOMAIN ); ?></small></div>
 			<div><strong><?php echo esc_html( $updated ); ?></strong><small><?php esc_html_e( 'Updated', WTI_TEXT_DOMAIN ); ?></small></div>
 			<div><strong><?php echo esc_html( $skipped ); ?></strong><small><?php esc_html_e( 'Unchanged', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( $deleted ); ?></strong><small><?php esc_html_e( 'Out of stock', WTI_TEXT_DOMAIN ); ?></small></div>
 			<div><strong><?php echo esc_html( isset( $execution['imported_images'] ) ? (int) $execution['imported_images'] : 0 ); ?></strong><small><?php esc_html_e( 'Images', WTI_TEXT_DOMAIN ); ?></small></div>
 			<div><strong><?php echo esc_html( $errors ); ?></strong><small><?php esc_html_e( 'Errors', WTI_TEXT_DOMAIN ); ?></small></div>
 		</div>

@@ -79,7 +79,11 @@ class WTI_Importer {
 		}
 
 		$plan            = WTI_Parser::build_import_plan( $offers );
+		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] );
+		$plan            = $index_result['plan'];
 		$summary         = WTI_Parser::summarize_plan( $plan );
+		$summary['unchanged_products']  = (int) $index_result['unchanged'];
+		$summary['deleted_products']    = (int) $index_result['deleted'];
 		$simple_offset   = isset( $args['simple_offset'] ) ? absint( $args['simple_offset'] ) : 0;
 		$variable_offset = isset( $args['variable_offset'] ) ? absint( $args['variable_offset'] ) : 0;
 		$simple_limit    = isset( $settings['import_limit'] ) ? absint( $settings['import_limit'] ) : 10;
@@ -106,6 +110,7 @@ class WTI_Importer {
 				'dry_run'        => 'yes' === $settings['dry_run'],
 				'import_limit'   => $simple_limit,
 				'variable_limit' => $variable_limit,
+				'deleted_limit'  => isset( $plan['deleted'] ) ? count( $plan['deleted'] ) : 0,
 				'simple_offset'  => 0,
 				'variable_offset' => 0,
 				'import_images'  => isset( $settings['import_images'] ) && 'yes' === $settings['import_images'],
@@ -144,6 +149,7 @@ class WTI_Importer {
 
 		self::save_last_result( $started, $result );
 		self::save_last_catalog_date( $catalog_date );
+		WTI_Feed_Index::save_from_store( $catalog_date );
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
 		self::release_import_lock();
 
@@ -182,10 +188,17 @@ class WTI_Importer {
 		}
 
 		$plan    = WTI_Parser::build_import_plan( $offers );
-		$summary = WTI_Parser::summarize_plan( $plan );
-		$total   = (int) $summary['simple_products'] + (int) $summary['variable_products'];
+		$full_summary = WTI_Parser::summarize_plan( $plan );
+		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] );
+		$plan         = $index_result['plan'];
+		$summary      = WTI_Parser::summarize_plan( $plan );
+		$summary['unchanged_products']   = (int) $index_result['unchanged'];
+		$summary['deleted_products']     = (int) $index_result['deleted'];
+		$summary['feed_total_products']  = (int) $full_summary['total_products'];
+		$total        = (int) $summary['simple_products'] + (int) $summary['variable_products'] + (int) $summary['deleted_products'];
+		$feed_total   = (int) $full_summary['simple_products'] + (int) $full_summary['variable_products'];
 
-		if ( $total < 1 ) {
+		if ( $feed_total < 1 ) {
 			self::fail_ajax_start( 'No products found for selected Totobi categories.' );
 		}
 
@@ -201,10 +214,12 @@ class WTI_Importer {
 			'total'               => $total,
 			'total_simple'        => (int) $summary['simple_products'],
 			'total_variable'      => (int) $summary['variable_products'],
+			'total_deleted'       => (int) $summary['deleted_products'],
 			'total_variations'    => (int) $summary['variations'],
 			'processed'           => 0,
 			'simple_offset'       => 0,
 			'variable_offset'     => 0,
+			'deleted_offset'      => 0,
 			'created_simple'      => 0,
 			'updated_simple'      => 0,
 			'created_variable'    => 0,
@@ -214,7 +229,8 @@ class WTI_Importer {
 			'imported_images'     => 0,
 			'reused_images'       => 0,
 			'skipped_images'      => 0,
-			'skipped_unchanged'   => 0,
+			'skipped_unchanged'   => (int) $summary['unchanged_products'],
+			'deleted_outofstock'  => 0,
 			'errors'              => 0,
 			'error_samples'       => array(),
 			'plan'                => $summary,
@@ -222,7 +238,7 @@ class WTI_Importer {
 		);
 
 		update_option( self::IMPORT_SESSION_OPTION, $session, false );
-		WTI_Logger::log( 'AJAX import started.', array( 'total' => $total, 'catalog_date' => $session['catalog_date'], 'dry_run' => $session['dry_run'] ) );
+		WTI_Logger::log( 'AJAX import started.', array( 'total' => $total, 'unchanged' => (int) $summary['unchanged_products'], 'deleted' => (int) $summary['deleted_products'], 'catalog_date' => $session['catalog_date'], 'dry_run' => $session['dry_run'] ) );
 
 		wp_send_json_success( self::session_response( $session ) );
 	}
@@ -256,11 +272,13 @@ class WTI_Importer {
 
 		$simple_total   = count( $plan['simple'] );
 		$variable_total = count( $plan['variable'] );
+		$deleted_total  = isset( $plan['deleted'] ) && is_array( $plan['deleted'] ) ? count( $plan['deleted'] ) : 0;
 		$batch_plan     = $plan;
 		$stage          = 'simple';
 
 		$batch_plan['simple']   = array();
 		$batch_plan['variable'] = array();
+		$batch_plan['deleted']  = array();
 
 		if ( $session['simple_offset'] < $simple_total ) {
 			$batch_plan['simple'] = array_slice( $plan['simple'], (int) $session['simple_offset'], $simple_size );
@@ -269,9 +287,13 @@ class WTI_Importer {
 			$stage = 'variable';
 			$batch_plan['variable'] = array_slice( $plan['variable'], (int) $session['variable_offset'], $variable_size );
 			$session['variable_offset'] += count( $batch_plan['variable'] );
+		} elseif ( $session['deleted_offset'] < $deleted_total ) {
+			$stage = 'deleted';
+			$batch_plan['deleted'] = array_slice( $plan['deleted'], (int) $session['deleted_offset'], 50 );
+			$session['deleted_offset'] += count( $batch_plan['deleted'] );
 		}
 
-		if ( empty( $batch_plan['simple'] ) && empty( $batch_plan['variable'] ) ) {
+		if ( empty( $batch_plan['simple'] ) && empty( $batch_plan['variable'] ) && empty( $batch_plan['deleted'] ) ) {
 			self::complete_ajax_session( $session );
 		}
 
@@ -290,6 +312,7 @@ class WTI_Importer {
 				'dry_run'        => ! empty( $session['dry_run'] ),
 				'import_limit'   => count( $batch_plan['simple'] ),
 				'variable_limit' => count( $batch_plan['variable'] ),
+				'deleted_limit'  => count( $batch_plan['deleted'] ),
 				'import_images'  => $import_images,
 				'product_status' => isset( $settings['product_status'] ) ? $settings['product_status'] : 'draft',
 			)
@@ -301,10 +324,10 @@ class WTI_Importer {
 		}
 
 		self::merge_execution_into_session( $session, $execution );
-		$session['processed'] = min( $session['total'], (int) $session['simple_offset'] + (int) $session['variable_offset'] );
+		$session['processed'] = min( $session['total'], (int) $session['simple_offset'] + (int) $session['variable_offset'] + (int) $session['deleted_offset'] );
 		$session['status']    = 'running';
 
-		if ( $session['simple_offset'] >= $simple_total && $session['variable_offset'] >= $variable_total ) {
+		if ( $session['simple_offset'] >= $simple_total && $session['variable_offset'] >= $variable_total && $session['deleted_offset'] >= $deleted_total ) {
 			self::complete_ajax_session( $session, $execution, $stage );
 		}
 
@@ -347,7 +370,7 @@ class WTI_Importer {
 	}
 
 	private static function merge_execution_into_session( &$session, $execution ) {
-		foreach ( array( 'created_simple', 'updated_simple', 'created_variable', 'updated_variable', 'created_variation', 'updated_variation', 'imported_images', 'reused_images', 'skipped_images', 'skipped_unchanged' ) as $key ) {
+		foreach ( array( 'created_simple', 'updated_simple', 'created_variable', 'updated_variable', 'created_variation', 'updated_variation', 'imported_images', 'reused_images', 'skipped_images', 'skipped_unchanged', 'deleted_outofstock' ) as $key ) {
 			$session[ $key ] = isset( $session[ $key ] ) ? (int) $session[ $key ] : 0;
 			$session[ $key ] += isset( $execution[ $key ] ) ? (int) $execution[ $key ] : 0;
 		}
@@ -392,6 +415,7 @@ class WTI_Importer {
 
 		self::save_last_result( isset( $session['started_at'] ) ? $session['started_at'] : current_time( 'mysql' ), $result );
 		self::save_last_catalog_date( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
+		WTI_Feed_Index::save_from_store( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
 		WTI_Logger::log( 'AJAX import completed.', $result );
 
 		$response                = self::session_response( $session );
@@ -411,10 +435,12 @@ class WTI_Importer {
 			'total'              => isset( $session['total'] ) ? (int) $session['total'] : 0,
 			'total_simple'       => isset( $session['total_simple'] ) ? (int) $session['total_simple'] : 0,
 			'total_variable'     => isset( $session['total_variable'] ) ? (int) $session['total_variable'] : 0,
+			'total_deleted'      => isset( $session['total_deleted'] ) ? (int) $session['total_deleted'] : 0,
 			'total_variations'   => isset( $session['total_variations'] ) ? (int) $session['total_variations'] : 0,
 			'processed'          => isset( $session['processed'] ) ? (int) $session['processed'] : 0,
 			'simple_offset'      => isset( $session['simple_offset'] ) ? (int) $session['simple_offset'] : 0,
 			'variable_offset'    => isset( $session['variable_offset'] ) ? (int) $session['variable_offset'] : 0,
+			'deleted_offset'     => isset( $session['deleted_offset'] ) ? (int) $session['deleted_offset'] : 0,
 			'created_simple'     => isset( $session['created_simple'] ) ? (int) $session['created_simple'] : 0,
 			'updated_simple'     => isset( $session['updated_simple'] ) ? (int) $session['updated_simple'] : 0,
 			'created_variable'   => isset( $session['created_variable'] ) ? (int) $session['created_variable'] : 0,
@@ -425,6 +451,7 @@ class WTI_Importer {
 			'reused_images'      => isset( $session['reused_images'] ) ? (int) $session['reused_images'] : 0,
 			'skipped_images'     => isset( $session['skipped_images'] ) ? (int) $session['skipped_images'] : 0,
 			'skipped_unchanged'  => isset( $session['skipped_unchanged'] ) ? (int) $session['skipped_unchanged'] : 0,
+			'deleted_outofstock' => isset( $session['deleted_outofstock'] ) ? (int) $session['deleted_outofstock'] : 0,
 			'errors'             => isset( $session['errors'] ) ? (int) $session['errors'] : 0,
 			'error_samples'      => isset( $session['error_samples'] ) ? $session['error_samples'] : array(),
 			'catalog_date'       => isset( $session['catalog_date'] ) ? $session['catalog_date'] : '',
@@ -462,6 +489,10 @@ class WTI_Importer {
 
 		if ( ! empty( $execution['skipped_unchanged'] ) ) {
 			$entries[] = sprintf( 'Unchanged records skipped: %d.', (int) $execution['skipped_unchanged'] );
+		}
+
+		if ( ! empty( $execution['deleted_outofstock'] ) ) {
+			$entries[] = sprintf( 'Missing Totobi products marked out of stock: %d.', (int) $execution['deleted_outofstock'] );
 		}
 
 		$samples = array();
