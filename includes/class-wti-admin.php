@@ -77,7 +77,15 @@ class WTI_Admin {
 		}
 
 		wp_enqueue_style( 'wti-admin', WTI_PLUGIN_URL . 'assets/css/admin.css', array(), WTI_VERSION );
-		wp_enqueue_script( 'wti-admin', WTI_PLUGIN_URL . 'assets/js/admin.js', array(), WTI_VERSION, true );
+		wp_enqueue_script( 'wti-admin', WTI_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), WTI_VERSION, true );
+		wp_localize_script(
+			'wti-admin',
+			'wtiAdmin',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'wti_ajax_nonce' ),
+			)
+		);
 	}
 
 	public static function handle_post_actions() {
@@ -99,10 +107,6 @@ class WTI_Admin {
 			self::redirect_with_notice( 'settings_saved' );
 		}
 
-		if ( 'manual_sync' === $action ) {
-			$result = WTI_Importer::run_manual_sync();
-			self::redirect_with_notice( is_wp_error( $result ) ? 'sync_error' : 'sync_started' );
-		}
 	}
 
 	private static function save_settings() {
@@ -250,11 +254,28 @@ class WTI_Admin {
 				<?php submit_button( __( 'Save settings', WTI_TEXT_DOMAIN ) ); ?>
 			</form>
 
-			<form method="post" action="" class="wti-manual-sync">
-				<?php wp_nonce_field( 'wti_admin_action', 'wti_nonce' ); ?>
-				<input type="hidden" name="wti_action" value="manual_sync">
-				<?php submit_button( __( 'Run manual sync check', WTI_TEXT_DOMAIN ), 'secondary' ); ?>
-			</form>
+			<div class="wti-import-panel">
+				<h2><?php esc_html_e( 'Manual import', WTI_TEXT_DOMAIN ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Import runs through AJAX batches, so the browser can continue from one package to the next without one long server request.', WTI_TEXT_DOMAIN ); ?></p>
+				<p>
+					<button type="button" class="button button-primary" id="wti-start-import"><?php esc_html_e( 'Start import', WTI_TEXT_DOMAIN ); ?></button>
+					<button type="button" class="button" id="wti-pause-import" style="display:none;"><?php esc_html_e( 'Pause', WTI_TEXT_DOMAIN ); ?></button>
+					<button type="button" class="button" id="wti-resume-import" style="display:none;"><?php esc_html_e( 'Resume', WTI_TEXT_DOMAIN ); ?></button>
+				</p>
+				<div id="wti-progress-wrap" class="wti-progress-wrap" style="display:none;">
+					<div class="wti-progress"><div class="wti-progress-bar"><span class="wti-progress-text">0%</span></div></div>
+					<table class="widefat striped wti-stats">
+						<tbody>
+							<tr><th><?php esc_html_e( 'Processed', WTI_TEXT_DOMAIN ); ?></th><td><span id="wti-stat-processed">0</span> / <span id="wti-stat-total">0</span></td></tr>
+							<tr><th><?php esc_html_e( 'Simple', WTI_TEXT_DOMAIN ); ?></th><td><?php esc_html_e( 'Created', WTI_TEXT_DOMAIN ); ?>: <span id="wti-stat-created-simple">0</span>, <?php esc_html_e( 'updated', WTI_TEXT_DOMAIN ); ?>: <span id="wti-stat-updated-simple">0</span></td></tr>
+							<tr><th><?php esc_html_e( 'Variable', WTI_TEXT_DOMAIN ); ?></th><td><?php esc_html_e( 'Created', WTI_TEXT_DOMAIN ); ?>: <span id="wti-stat-created-variable">0</span>, <?php esc_html_e( 'updated', WTI_TEXT_DOMAIN ); ?>: <span id="wti-stat-updated-variable">0</span></td></tr>
+							<tr><th><?php esc_html_e( 'Variations', WTI_TEXT_DOMAIN ); ?></th><td><?php esc_html_e( 'Created', WTI_TEXT_DOMAIN ); ?>: <span id="wti-stat-created-variation">0</span>, <?php esc_html_e( 'updated', WTI_TEXT_DOMAIN ); ?>: <span id="wti-stat-updated-variation">0</span></td></tr>
+							<tr><th><?php esc_html_e( 'Errors', WTI_TEXT_DOMAIN ); ?></th><td><span id="wti-stat-errors">0</span></td></tr>
+						</tbody>
+					</table>
+					<pre id="wti-log-output" class="wti-box"></pre>
+				</div>
+			</div>
 
 			<h2><?php esc_html_e( 'Last sync', WTI_TEXT_DOMAIN ); ?></h2>
 			<pre class="wti-box"><?php echo esc_html( wp_json_encode( $last_result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ); ?></pre>

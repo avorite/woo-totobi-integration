@@ -17,3 +17,40 @@
 	margin-top: 16px;
 }
 
+.wti-admin .wti-import-panel {
+	margin-top: 24px;
+	padding-top: 8px;
+	border-top: 1px solid #dcdcde;
+}
+
+.wti-admin .wti-progress-wrap {
+	max-width: 860px;
+}
+
+.wti-admin .wti-progress {
+	height: 24px;
+	margin: 12px 0;
+	overflow: hidden;
+	background: #f0f0f1;
+	border: 1px solid #c3c4c7;
+}
+
+.wti-admin .wti-progress-bar {
+	width: 0;
+	height: 100%;
+	line-height: 24px;
+	color: #fff;
+	text-align: center;
+	background: #2271b1;
+	transition: width 0.2s ease;
+}
+
+.wti-admin .wti-progress-text {
+	display: block;
+	min-width: 40px;
+}
+
+.wti-admin .wti-stats {
+	max-width: 860px;
+	margin: 12px 0;
+}

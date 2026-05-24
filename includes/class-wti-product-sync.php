@@ -74,6 +74,8 @@ class WTI_Product_Sync {
 				'dry_run'        => true,
 				'import_limit'   => 10,
 				'variable_limit' => 1,
+				'simple_offset'  => 0,
+				'variable_offset' => 0,
 				'import_images'  => false,
 				'product_status' => 'draft',
 			)
@@ -93,10 +95,24 @@ class WTI_Product_Sync {
 
 		$simple_limit   = max( 0, absint( $args['import_limit'] ) );
 		$variable_limit = max( 0, absint( $args['variable_limit'] ) );
+		$simple_offset  = max( 0, absint( $args['simple_offset'] ) );
+		$variable_offset = max( 0, absint( $args['variable_offset'] ) );
+		$simple_total   = count( $actions['simple'] );
+		$variable_total = count( $actions['variable'] );
+		$simple_batch   = $simple_limit > 0 ? array_slice( $actions['simple'], $simple_offset, $simple_limit ) : array();
+		$variable_batch = $variable_limit > 0 ? array_slice( $actions['variable'], $variable_offset, $variable_limit ) : array();
 		$status         = in_array( $args['product_status'], array( 'draft', 'publish' ), true ) ? $args['product_status'] : 'draft';
 		$result         = array(
 			'status'             => 'written',
 			'processed'          => 0,
+			'simple_total'       => $simple_total,
+			'variable_total'     => $variable_total,
+			'simple_offset'      => $simple_offset,
+			'variable_offset'    => $variable_offset,
+			'next_simple_offset' => min( $simple_total, $simple_offset + count( $simple_batch ) ),
+			'next_variable_offset' => min( $variable_total, $variable_offset + count( $variable_batch ) ),
+			'simple_complete'    => $simple_offset + count( $simple_batch ) >= $simple_total,
+			'variable_complete'  => $variable_offset + count( $variable_batch ) >= $variable_total,
 			'created_simple'     => 0,
 			'updated_simple'     => 0,
 			'created_variable'   => 0,
@@ -111,12 +127,7 @@ class WTI_Product_Sync {
 			'errors'             => array(),
 		);
 
-		foreach ( $actions['simple'] as $action ) {
-			if ( $result['created_simple'] + $result['updated_simple'] >= $simple_limit ) {
-				$result['skipped_simple']++;
-				break;
-			}
-
+		foreach ( $simple_batch as $action ) {
 			$write = self::write_simple_product( $action, $status, ! empty( $args['import_images'] ) );
 
 			if ( is_wp_error( $write ) ) {
@@ -141,12 +152,7 @@ class WTI_Product_Sync {
 
 		$variation_actions = self::index_variation_actions_by_group( $actions['variations'] );
 
-		foreach ( $actions['variable'] as $action ) {
-			if ( $result['created_variable'] + $result['updated_variable'] >= $variable_limit ) {
-				$result['skipped_variable']++;
-				continue;
-			}
-
+		foreach ( $variable_batch as $action ) {
 			$write = self::write_variable_product( $action, $status, ! empty( $args['import_images'] ) );
 
 			if ( is_wp_error( $write ) ) {
@@ -191,6 +197,8 @@ class WTI_Product_Sync {
 			}
 		}
 
+		$result['skipped_simple']    = max( 0, $simple_total - $result['next_simple_offset'] );
+		$result['skipped_variable']  = max( 0, $variable_total - $result['next_variable_offset'] );
 		$result['skipped_variation'] = max( 0, count( $actions['variations'] ) - $result['created_variation'] - $result['updated_variation'] );
 
 		return $result;
