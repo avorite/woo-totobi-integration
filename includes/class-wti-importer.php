@@ -57,6 +57,7 @@ class WTI_Importer {
 			array(
 				'dry_run'      => 'yes' === $settings['dry_run'],
 				'catalog_date' => isset( $meta['date'] ) ? $meta['date'] : '',
+				'category_map' => isset( $settings['category_map'] ) ? $settings['category_map'] : array(),
 			)
 		);
 		$execution = WTI_Product_Sync::execute_action_plan(

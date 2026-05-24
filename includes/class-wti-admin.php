@@ -33,6 +33,24 @@ class WTI_Admin {
 		);
 	}
 
+	public static function get_known_totobi_categories() {
+		return array(
+			'187' => array( 'name' => 'Металеві ручки', 'path' => '/ruchki/' ),
+			'188' => array( 'name' => 'Пластикові ручки', 'path' => '/ruchki/' ),
+			'269' => array( 'name' => 'Еко ручки', 'path' => '/ruchki/' ),
+			'314' => array( 'name' => 'Олівці', 'path' => '/ruchki/' ),
+			'287' => array( 'name' => 'Ліхтарики', 'path' => '/podorozh-ta-vdpochinok/lhtariki/' ),
+			'184' => array( 'name' => 'Пляшки для пиття', 'path' => '/podorozh-ta-vdpochinok/plyashki-dlya-pittya/' ),
+			'185' => array( 'name' => 'Термоси та термокружки', 'path' => '/podorozh-ta-vdpochinok/termosi-ta-termokruzhki/' ),
+			'246' => array( 'name' => 'Реглани, фліси', 'path' => '/odyag/reglani/' ),
+			'215' => array( 'name' => 'Жилети', 'path' => '/odyag/zhiletki/' ),
+			'205' => array( 'name' => 'Записні книжки', 'path' => '/ofs-uk/bloknoti/' ),
+			'298' => array( 'name' => 'Годинники', 'path' => '/elektronka/godinniki/' ),
+			'251' => array( 'name' => 'Зарядні пристрої', 'path' => '/elektronka/zaryadn-pristro/' ),
+			'282' => array( 'name' => 'Подарункова коробка', 'path' => '/upakovka-uk/podarunkova-upakovka/' ),
+		);
+	}
+
 	public static function get_settings() {
 		$settings = get_option( WTI_OPTION_KEY, array() );
 
@@ -98,7 +116,7 @@ class WTI_Admin {
 			'import_limit'   => isset( $_POST['import_limit'] ) ? max( 1, absint( wp_unslash( $_POST['import_limit'] ) ) ) : 10,
 			'product_status' => isset( $_POST['product_status'] ) && in_array( $_POST['product_status'], array( 'draft', 'publish' ), true ) ? sanitize_key( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 			'selected_paths' => $paths ? $paths : self::get_default_totobi_paths(),
-			'category_map'   => array(),
+			'category_map'   => self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ),
 		);
 
 		update_option( WTI_OPTION_KEY, $settings, false );
@@ -158,6 +176,10 @@ class WTI_Admin {
 								<label class="wti-path"><input type="checkbox" name="selected_paths[]" value="<?php echo esc_attr( $path ); ?>" <?php checked( in_array( $path, (array) $settings['selected_paths'], true ) ); ?>> <code><?php echo esc_html( $path ); ?></code></label>
 							<?php endforeach; ?>
 						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'WooCommerce category mapping', WTI_TEXT_DOMAIN ); ?></th>
+						<td><?php self::render_category_mapping_table( $settings ); ?></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="markup_percent"><?php esc_html_e( 'Markup percent', WTI_TEXT_DOMAIN ); ?></label></th>
@@ -220,5 +242,101 @@ class WTI_Admin {
 		);
 
 		return isset( $messages[ $notice ] ) ? $messages[ $notice ] : '';
+	}
+
+	private static function sanitize_category_map( $raw_map ) {
+		$map   = array();
+		$known = self::get_known_totobi_categories();
+
+		foreach ( $known as $totobi_id => $category ) {
+			$value = isset( $raw_map[ $totobi_id ] ) ? absint( $raw_map[ $totobi_id ] ) : 0;
+
+			if ( $value > 0 ) {
+				$map[ $totobi_id ] = $value;
+			}
+		}
+
+		return $map;
+	}
+
+	private static function render_category_mapping_table( $settings ) {
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'product_cat',
+				'hide_empty' => false,
+			)
+		);
+
+		if ( is_wp_error( $terms ) ) {
+			echo '<p class="description">' . esc_html__( 'Cannot load WooCommerce categories.', WTI_TEXT_DOMAIN ) . '</p>';
+			return;
+		}
+
+		$terms = self::sort_terms_for_select( $terms );
+		$map   = isset( $settings['category_map'] ) && is_array( $settings['category_map'] ) ? $settings['category_map'] : array();
+
+		echo '<table class="widefat striped wti-category-map"><thead><tr>';
+		echo '<th>' . esc_html__( 'Totobi ID', WTI_TEXT_DOMAIN ) . '</th>';
+		echo '<th>' . esc_html__( 'Totobi category', WTI_TEXT_DOMAIN ) . '</th>';
+		echo '<th>' . esc_html__( 'Client path', WTI_TEXT_DOMAIN ) . '</th>';
+		echo '<th>' . esc_html__( 'WooCommerce category', WTI_TEXT_DOMAIN ) . '</th>';
+		echo '</tr></thead><tbody>';
+
+		foreach ( self::get_known_totobi_categories() as $totobi_id => $category ) {
+			$selected = isset( $map[ $totobi_id ] ) ? (int) $map[ $totobi_id ] : 0;
+
+			echo '<tr>';
+			echo '<td><code>' . esc_html( $totobi_id ) . '</code></td>';
+			echo '<td>' . esc_html( $category['name'] ) . '</td>';
+			echo '<td><code>' . esc_html( $category['path'] ) . '</code></td>';
+			echo '<td><select name="category_map[' . esc_attr( $totobi_id ) . ']">';
+			echo '<option value="0">' . esc_html__( 'Do not assign', WTI_TEXT_DOMAIN ) . '</option>';
+
+			foreach ( $terms as $term ) {
+				printf(
+					'<option value="%d" %s>%s</option>',
+					(int) $term->term_id,
+					selected( $selected, (int) $term->term_id, false ),
+					esc_html( $term->label )
+				);
+			}
+
+			echo '</select></td>';
+			echo '</tr>';
+		}
+
+		echo '</tbody></table>';
+	}
+
+	private static function sort_terms_for_select( $terms ) {
+		$by_parent = array();
+
+		foreach ( $terms as $term ) {
+			$by_parent[ (int) $term->parent ][] = $term;
+		}
+
+		$sorted = array();
+		self::append_child_terms( 0, $by_parent, $sorted, 0 );
+
+		return $sorted;
+	}
+
+	private static function append_child_terms( $parent_id, $by_parent, &$sorted, $depth ) {
+		if ( empty( $by_parent[ $parent_id ] ) ) {
+			return;
+		}
+
+		usort(
+			$by_parent[ $parent_id ],
+			function ( $left, $right ) {
+				return strnatcasecmp( $left->name, $right->name );
+			}
+		);
+
+		foreach ( $by_parent[ $parent_id ] as $term ) {
+			$term->label = str_repeat( '- ', $depth ) . $term->name;
+			$sorted[]    = $term;
+			self::append_child_terms( (int) $term->term_id, $by_parent, $sorted, $depth + 1 );
+		}
 	}
 }

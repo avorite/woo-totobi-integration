@@ -18,6 +18,7 @@ class WTI_Product_Sync {
 			array(
 				'dry_run'      => true,
 				'catalog_date' => '',
+				'category_map' => array(),
 			)
 		);
 
@@ -139,6 +140,7 @@ class WTI_Product_Sync {
 			'price'       => $offer['price'],
 			'stock'       => $offer['quantity_in_stock'],
 			'stock_status' => $offer['stock_status'],
+			'woo_category_ids' => self::resolve_woo_category_ids( $offer, $args ),
 			'description' => $offer['description'],
 			'params'      => $offer['params'],
 			'pictures'    => $offer['pictures'],
@@ -163,6 +165,10 @@ class WTI_Product_Sync {
 			$product->set_manage_stock( true );
 			$product->set_stock_quantity( max( 0, (int) $action['stock'] ) );
 			$product->set_stock_status( $action['stock_status'] );
+
+			if ( ! empty( $action['woo_category_ids'] ) ) {
+				$product->set_category_ids( array_map( 'absint', $action['woo_category_ids'] ) );
+			}
 
 			if ( ! empty( $action['sku'] ) && $product->get_sku() !== $action['sku'] ) {
 				$product->set_sku( $action['sku'] );
@@ -198,6 +204,7 @@ class WTI_Product_Sync {
 			'category_id'     => $parent['category_id'],
 			'variation_count' => count( $variable['variations'] ),
 			'attributes'      => self::collect_variable_attributes( $variable['variations'] ),
+			'woo_category_ids' => self::resolve_woo_category_ids( $parent, $args ),
 			'meta'            => self::build_common_meta( $parent, $args ),
 		);
 	}
@@ -231,6 +238,17 @@ class WTI_Product_Sync {
 			self::META_RAW_HASH     => $offer['raw_hash'],
 			self::META_CATALOG_DATE => isset( $args['catalog_date'] ) ? $args['catalog_date'] : '',
 		);
+	}
+
+	private static function resolve_woo_category_ids( $offer, $args ) {
+		$map         = isset( $args['category_map'] ) && is_array( $args['category_map'] ) ? $args['category_map'] : array();
+		$category_id = isset( $offer['category_id'] ) ? (string) $offer['category_id'] : '';
+
+		if ( '' === $category_id || empty( $map[ $category_id ] ) ) {
+			return array();
+		}
+
+		return array( absint( $map[ $category_id ] ) );
 	}
 
 	private static function collect_variable_attributes( $variations ) {
