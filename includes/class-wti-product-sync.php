@@ -227,6 +227,7 @@ class WTI_Product_Sync {
 			$product->set_status( $status );
 			$product->set_catalog_visibility( 'visible' );
 			$product->set_description( wp_kses_post( $action['description'] ) );
+			$product->set_attributes( self::build_display_attributes( $action['params'] ) );
 			$product->set_regular_price( wc_format_decimal( $action['price'] ) );
 			$product->set_price( wc_format_decimal( $action['price'] ) );
 			$product->set_manage_stock( true );
@@ -277,7 +278,7 @@ class WTI_Product_Sync {
 			$product->set_status( $status );
 			$product->set_catalog_visibility( 'visible' );
 			$product->set_sku( $action['sku'] );
-			$product->set_attributes( self::build_product_attributes( $action['attributes'] ) );
+			$product->set_attributes( self::merge_product_attributes( self::build_product_attributes( $action['attributes'] ), self::build_display_attributes( $action['params'], 10 ) ) );
 
 			if ( ! empty( $action['woo_category_ids'] ) ) {
 				$product->set_category_ids( array_map( 'absint', $action['woo_category_ids'] ) );
@@ -372,6 +373,7 @@ class WTI_Product_Sync {
 			'attributes'      => self::collect_variable_attributes( $variable['variations'] ),
 			'woo_category_ids' => self::resolve_woo_category_ids( $parent, $args ),
 			'pictures'        => $parent['pictures'],
+			'params'          => $parent['params'],
 			'meta'            => self::build_common_meta( $parent, $args ),
 		);
 	}
@@ -459,6 +461,38 @@ class WTI_Product_Sync {
 		}
 
 		return $product_attributes;
+	}
+
+	private static function build_display_attributes( $params, $start_position = 0 ) {
+		$product_attributes = array();
+		$position           = $start_position;
+		$skip               = array( 'Розмір', 'Колір' );
+
+		foreach ( (array) $params as $name => $value ) {
+			$name  = trim( (string) $name );
+			$value = trim( (string) $value );
+
+			if ( '' === $name || '' === $value || in_array( $name, $skip, true ) ) {
+				continue;
+			}
+
+			$key       = sanitize_title( $name );
+			$attribute = new WC_Product_Attribute();
+			$attribute->set_id( 0 );
+			$attribute->set_name( $name );
+			$attribute->set_options( array( $value ) );
+			$attribute->set_position( $position++ );
+			$attribute->set_visible( true );
+			$attribute->set_variation( false );
+
+			$product_attributes[ $key ] = $attribute;
+		}
+
+		return $product_attributes;
+	}
+
+	private static function merge_product_attributes( $variation_attributes, $display_attributes ) {
+		return array_merge( $variation_attributes, $display_attributes );
 	}
 
 	private static function index_variation_actions_by_group( $variation_actions ) {
