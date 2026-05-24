@@ -86,13 +86,14 @@
 .wti-admin .wti-metric-grid,
 .wti-admin .wti-summary {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(130px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 	gap: 10px;
 	margin: 14px 0;
 }
 
 .wti-admin .wti-metric-grid div,
 .wti-admin .wti-summary div {
+	min-width: 0;
 	min-height: 58px;
 	padding: 12px;
 	background: #f6f7f7;
@@ -106,6 +107,7 @@
 	font-size: 19px;
 	line-height: 1.25;
 	color: #101517;
+	overflow-wrap: anywhere;
 }
 
 .wti-admin .wti-metric-grid small,
@@ -229,7 +231,7 @@
 
 	.wti-admin .wti-metric-grid,
 	.wti-admin .wti-summary {
-		grid-template-columns: repeat(2, minmax(130px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 	}
 }
 
