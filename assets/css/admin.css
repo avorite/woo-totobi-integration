@@ -3,54 +3,129 @@
 	margin: 0 0 6px;
 }
 
-.wti-admin .wti-box {
-	box-sizing: border-box;
-	max-width: 100%;
-	min-height: 80px;
-	padding: 12px;
-	overflow: auto;
-	background: #fff;
-	border: 1px solid #dcdcde;
-}
-
-.wti-admin .wti-manual-sync {
-	margin-top: 16px;
-}
-
 .wti-admin .wti-import-panel {
-	margin-top: 24px;
-	padding-top: 8px;
-	border-top: 1px solid #dcdcde;
+	max-width: 1120px;
+	margin: 18px 0 28px;
+	padding: 18px 20px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+}
+
+.wti-admin .wti-panel-header {
+	display: flex;
+	gap: 16px;
+	align-items: flex-start;
+	justify-content: space-between;
+}
+
+.wti-admin .wti-panel-header h2 {
+	margin-top: 0;
+}
+
+.wti-admin .wti-actions {
+	display: flex;
+	gap: 8px;
+	min-width: 220px;
+	justify-content: flex-end;
 }
 
 .wti-admin .wti-progress-wrap {
-	max-width: 860px;
+	margin-top: 16px;
+}
+
+.wti-admin .wti-progress-status {
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 8px;
+	font-weight: 600;
 }
 
 .wti-admin .wti-progress {
-	height: 24px;
-	margin: 12px 0;
+	height: 18px;
 	overflow: hidden;
 	background: #f0f0f1;
 	border: 1px solid #c3c4c7;
+	border-radius: 3px;
 }
 
 .wti-admin .wti-progress-bar {
 	width: 0;
 	height: 100%;
-	line-height: 24px;
-	color: #fff;
-	text-align: center;
 	background: #2271b1;
 	transition: width 0.2s ease;
 }
 
-.wti-admin .wti-progress-text {
-	display: block;
-	min-width: 40px;
+.wti-admin .wti-metric-grid,
+.wti-admin .wti-summary {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(120px, 1fr));
+	gap: 10px;
+	margin: 14px 0;
 }
 
-.wti-admin .wti-stats {
-	max-width: 860px;
-	margin: 12px 0;
+.wti-admin .wti-metric-grid div,
+.wti-admin .wti-summary div {
+	padding: 12px;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+}
+
+.wti-admin .wti-metric-grid span,
+.wti-admin .wti-summary strong {
+	display: block;
+	font-size: 18px;
+	line-height: 1.25;
+}
+
+.wti-admin .wti-metric-grid small,
+.wti-admin .wti-summary small {
+	display: block;
+	margin-top: 4px;
+	color: #646970;
+}
+
+.wti-admin .wti-log-list,
+.wti-admin .wti-log-tail {
+	box-sizing: border-box;
+	max-width: 1120px;
+	margin: 10px 0 0;
+	padding: 10px 12px;
+	overflow: auto;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+}
+
+.wti-admin .wti-log-list {
+	max-height: 220px;
+	font-family: Consolas, Monaco, monospace;
+	font-size: 12px;
+}
+
+.wti-admin .wti-log-list div {
+	padding: 3px 0;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.wti-admin .wti-log-tail {
+	list-style: disc;
+	padding-left: 28px;
+}
+
+@media (max-width: 900px) {
+	.wti-admin .wti-panel-header {
+		display: block;
+	}
+
+	.wti-admin .wti-actions {
+		justify-content: flex-start;
+		margin-top: 12px;
+	}
+
+	.wti-admin .wti-metric-grid,
+	.wti-admin .wti-summary {
+		grid-template-columns: repeat(2, minmax(120px, 1fr));
+	}
 }

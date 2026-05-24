@@ -228,6 +228,13 @@ class WTI_Importer {
 		$settings       = isset( $session['settings'] ) && is_array( $session['settings'] ) ? $session['settings'] : WTI_Admin::get_settings();
 		$simple_size    = isset( $_POST['simple_batch_size'] ) ? min( 100, max( 1, absint( wp_unslash( $_POST['simple_batch_size'] ) ) ) ) : min( 50, max( 1, absint( $settings['import_limit'] ) ) );
 		$variable_size  = isset( $_POST['variable_batch_size'] ) ? min( 20, max( 1, absint( wp_unslash( $_POST['variable_batch_size'] ) ) ) ) : min( 10, max( 1, absint( $settings['variable_limit'] ) ) );
+		$import_images  = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
+
+		if ( $import_images ) {
+			$simple_size   = min( $simple_size, 1 );
+			$variable_size = min( $variable_size, 1 );
+		}
+
 		$simple_total   = count( $plan['simple'] );
 		$variable_total = count( $plan['variable'] );
 		$batch_plan     = $plan;
@@ -264,7 +271,7 @@ class WTI_Importer {
 				'dry_run'        => ! empty( $session['dry_run'] ),
 				'import_limit'   => count( $batch_plan['simple'] ),
 				'variable_limit' => count( $batch_plan['variable'] ),
-				'import_images'  => isset( $settings['import_images'] ) && 'yes' === $settings['import_images'],
+				'import_images'  => $import_images,
 				'product_status' => isset( $settings['product_status'] ) ? $settings['product_status'] : 'draft',
 			)
 		);
@@ -285,7 +292,7 @@ class WTI_Importer {
 		$response                 = self::session_response( $session );
 		$response['completed']    = false;
 		$response['stage']        = $stage;
-		$response['log_entries']  = self::build_batch_log_entries( $execution, $stage );
+		$response['log_entries']  = self::build_batch_log_entries( $execution, $stage, $actions );
 
 		wp_send_json_success( $response );
 	}
@@ -369,7 +376,7 @@ class WTI_Importer {
 		$response                = self::session_response( $session );
 		$response['completed']   = true;
 		$response['stage']       = $stage;
-		$response['log_entries'] = self::build_batch_log_entries( $last_execution, $stage );
+		$response['log_entries'] = self::build_batch_log_entries( $last_execution, $stage, array() );
 		wp_send_json_success( $response );
 	}
 
@@ -403,15 +410,15 @@ class WTI_Importer {
 		);
 	}
 
-	private static function build_batch_log_entries( $execution, $stage ) {
+	private static function build_batch_log_entries( $execution, $stage, $actions = array() ) {
 		if ( empty( $execution ) || ! is_array( $execution ) ) {
 			return array();
 		}
 
-		return array(
+		$entries = array(
 			sprintf(
-				'%s batch: simple +%d/%d, variable +%d/%d, variations +%d/%d, errors %d',
-				$stage,
+				'%s: simple %d created, %d updated; variable %d created, %d updated; variations %d created, %d updated; errors %d',
+				'simple' === $stage ? 'Simple products batch' : 'Variable products batch',
 				isset( $execution['created_simple'] ) ? (int) $execution['created_simple'] : 0,
 				isset( $execution['updated_simple'] ) ? (int) $execution['updated_simple'] : 0,
 				isset( $execution['created_variable'] ) ? (int) $execution['created_variable'] : 0,
@@ -421,6 +428,33 @@ class WTI_Importer {
 				isset( $execution['errors'] ) && is_array( $execution['errors'] ) ? count( $execution['errors'] ) : 0
 			),
 		);
+
+		if ( ! empty( $execution['imported_images'] ) || ! empty( $execution['reused_images'] ) || ! empty( $execution['skipped_images'] ) ) {
+			$entries[] = sprintf(
+				'Images: %d downloaded, %d reused, %d unchanged.',
+				isset( $execution['imported_images'] ) ? (int) $execution['imported_images'] : 0,
+				isset( $execution['reused_images'] ) ? (int) $execution['reused_images'] : 0,
+				isset( $execution['skipped_images'] ) ? (int) $execution['skipped_images'] : 0
+			);
+		}
+
+		$samples = array();
+
+		if ( ! empty( $actions['simple'] ) ) {
+			foreach ( array_slice( $actions['simple'], 0, 3 ) as $action ) {
+				$samples[] = sprintf( '%s (%s)', $action['name'], $action['sku'] );
+			}
+		} elseif ( ! empty( $actions['variable'] ) ) {
+			foreach ( array_slice( $actions['variable'], 0, 3 ) as $action ) {
+				$samples[] = sprintf( '%s (%s)', $action['name'], $action['sku'] );
+			}
+		}
+
+		if ( $samples ) {
+			$entries[] = 'Products: ' . implode( '; ', $samples );
+		}
+
+		return $entries;
 	}
 
 	private static function build_action_summary( $actions ) {
