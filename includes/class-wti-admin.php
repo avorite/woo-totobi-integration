@@ -196,10 +196,10 @@ class WTI_Admin {
 						<td><input type="number" step="0.01" id="markup_percent" name="markup_percent" value="<?php echo esc_attr( $settings['markup_percent'] ); ?>"></td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="sync_time"><?php esc_html_e( 'Daily sync time', WTI_TEXT_DOMAIN ); ?></label></th>
+						<th scope="row"><label for="sync_time"><?php esc_html_e( 'First sync time', WTI_TEXT_DOMAIN ); ?></label></th>
 						<td>
 							<input type="time" id="sync_time" name="sync_time" value="<?php echo esc_attr( $settings['sync_time'] ); ?>">
-							<p class="description"><?php echo esc_html( $next_run ? sprintf( __( 'Next run: %s', WTI_TEXT_DOMAIN ), wp_date( 'Y-m-d H:i:s', $next_run ) ) : __( 'Not scheduled yet.', WTI_TEXT_DOMAIN ) ); ?></p>
+							<p class="description"><?php echo esc_html( $next_run ? sprintf( __( 'Next automatic run: %s', WTI_TEXT_DOMAIN ), wp_date( 'Y-m-d H:i:s', $next_run ) ) : __( 'Automatic sync is not scheduled yet.', WTI_TEXT_DOMAIN ) ); ?></p>
 						</td>
 					</tr>
 					<tr>
@@ -210,34 +210,34 @@ class WTI_Admin {
 								<option value="<?php echo esc_attr( WTI_Scheduler::SCHEDULE_SIX_HOURS ); ?>" <?php selected( $settings['sync_interval'], WTI_Scheduler::SCHEDULE_SIX_HOURS ); ?>><?php esc_html_e( 'Every 6 hours', WTI_TEXT_DOMAIN ); ?></option>
 								<option value="daily" <?php selected( $settings['sync_interval'], 'daily' ); ?>><?php esc_html_e( 'Daily', WTI_TEXT_DOMAIN ); ?></option>
 							</select>
-							<p class="description"><?php esc_html_e( 'Prom YML observations showed 12:00 -> 16:00, so every 4 hours is the default. Unchanged catalog dates are skipped.', WTI_TEXT_DOMAIN ); ?></p>
+							<p class="description"><?php esc_html_e( 'Totobi Prom YML is checked on this interval. If the catalog date has not changed, the automatic sync is skipped.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Write mode', WTI_TEXT_DOMAIN ); ?></th>
 						<td>
-							<label><input type="checkbox" name="dry_run" value="yes" <?php checked( $settings['dry_run'], 'yes' ); ?>> <?php esc_html_e( 'Dry-run only, do not create or update products', WTI_TEXT_DOMAIN ); ?></label>
+							<label><input type="checkbox" name="dry_run" value="yes" <?php checked( $settings['dry_run'], 'yes' ); ?>> <?php esc_html_e( 'Preview only, do not write product changes', WTI_TEXT_DOMAIN ); ?></label>
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="import_limit"><?php esc_html_e( 'Simple product write limit', WTI_TEXT_DOMAIN ); ?></label></th>
+						<th scope="row"><label for="import_limit"><?php esc_html_e( 'Simple product batch size', WTI_TEXT_DOMAIN ); ?></label></th>
 						<td>
 							<input type="number" min="1" max="100" id="import_limit" name="import_limit" value="<?php echo esc_attr( $settings['import_limit'] ); ?>">
-							<p class="description"><?php esc_html_e( 'Only simple products are writable at this stage. Variations and images are still skipped.', WTI_TEXT_DOMAIN ); ?></p>
+							<p class="description"><?php esc_html_e( 'Number of simple products processed per AJAX request. This is not a total import limit.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="variable_limit"><?php esc_html_e( 'Variable product write limit', WTI_TEXT_DOMAIN ); ?></label></th>
+						<th scope="row"><label for="variable_limit"><?php esc_html_e( 'Variable product batch size', WTI_TEXT_DOMAIN ); ?></label></th>
 						<td>
 							<input type="number" min="0" max="20" id="variable_limit" name="variable_limit" value="<?php echo esc_attr( $settings['variable_limit'] ); ?>">
-							<p class="description"><?php esc_html_e( 'Controls how many variable parent products are written per run. All valid variations for those parents are written.', WTI_TEXT_DOMAIN ); ?></p>
+							<p class="description"><?php esc_html_e( 'Number of variable parent products processed per AJAX request. All valid variations for those parents are processed in the same batch.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Images', WTI_TEXT_DOMAIN ); ?></th>
 						<td>
-							<label><input type="checkbox" name="import_images" value="yes" <?php checked( $settings['import_images'], 'yes' ); ?>> <?php esc_html_e( 'Import product images', WTI_TEXT_DOMAIN ); ?></label>
-							<p class="description"><?php esc_html_e( 'Images are deduplicated by source URL. Keep disabled during parser-only tests.', WTI_TEXT_DOMAIN ); ?></p>
+							<label><input type="checkbox" name="import_images" value="yes" <?php checked( $settings['import_images'], 'yes' ); ?>> <?php esc_html_e( 'Import product images from Totobi', WTI_TEXT_DOMAIN ); ?></label>
+							<p class="description"><?php esc_html_e( 'Uses Totobi picture tags: the first image becomes the featured image, the rest go to the gallery. Existing imported images are reused by source URL hash.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 					<tr>
@@ -255,10 +255,10 @@ class WTI_Admin {
 			</form>
 
 			<div class="wti-import-panel">
-				<h2><?php esc_html_e( 'Manual import', WTI_TEXT_DOMAIN ); ?></h2>
-				<p class="description"><?php esc_html_e( 'Import runs through AJAX batches, so the browser can continue from one package to the next without one long server request.', WTI_TEXT_DOMAIN ); ?></p>
+				<h2><?php esc_html_e( 'Manual sync', WTI_TEXT_DOMAIN ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Runs the Totobi sync in AJAX batches, showing progress while products, variations, and selected media are processed.', WTI_TEXT_DOMAIN ); ?></p>
 				<p>
-					<button type="button" class="button button-primary" id="wti-start-import"><?php esc_html_e( 'Start import', WTI_TEXT_DOMAIN ); ?></button>
+					<button type="button" class="button button-primary" id="wti-start-import"><?php esc_html_e( 'Start sync', WTI_TEXT_DOMAIN ); ?></button>
 					<button type="button" class="button" id="wti-pause-import" style="display:none;"><?php esc_html_e( 'Pause', WTI_TEXT_DOMAIN ); ?></button>
 					<button type="button" class="button" id="wti-resume-import" style="display:none;"><?php esc_html_e( 'Resume', WTI_TEXT_DOMAIN ); ?></button>
 				</p>

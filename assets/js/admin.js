@@ -24,13 +24,13 @@
 			_wpnonce: wtiAdmin.nonce
 		}).done(function (response) {
 			if (!response.success) {
-				addLog('ERROR: ' + (response.data || 'Cannot start import'));
+				addLog('ERROR: ' + (response.data || 'Cannot start sync'));
 				resetUi();
 				return;
 			}
 
 			updateProgress(response.data);
-			addLog('Import started. Products: ' + response.data.total + ', catalog: ' + response.data.catalog_date);
+			addLog('Sync started. Products: ' + response.data.total + ', catalog: ' + response.data.catalog_date);
 			processBatch();
 		}).fail(function () {
 			addLog('ERROR: AJAX start request failed');
@@ -60,7 +60,7 @@
 			(data.log_entries || []).forEach(addLog);
 
 			if (data.completed) {
-				addLog('Import completed.');
+				addLog('Sync completed.');
 				resetUi();
 				return;
 			}
@@ -76,7 +76,7 @@
 		isPaused = true;
 		$('#wti-pause-import').hide();
 		$('#wti-resume-import').show();
-		addLog('Import paused.');
+		addLog('Sync paused.');
 
 		$.post(wtiAdmin.ajaxUrl, {
 			action: 'wti_pause_import',
@@ -88,7 +88,7 @@
 		isPaused = false;
 		$('#wti-pause-import').show();
 		$('#wti-resume-import').hide();
-		addLog('Import resumed.');
+		addLog('Sync resumed.');
 
 		$.post(wtiAdmin.ajaxUrl, {
 			action: 'wti_resume_import',
