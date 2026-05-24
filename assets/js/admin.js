@@ -4,6 +4,15 @@
 	var isProcessing = false;
 	var isPaused = false;
 	var retryCount = 0;
+	var strings = wtiAdmin.strings || {};
+
+	function t(key, fallback, replacements) {
+		var text = strings[key] || fallback;
+		Object.keys(replacements || {}).forEach(function (name) {
+			text = text.replace('%' + name + '%', replacements[name]);
+		});
+		return text;
+	}
 
 	function startImport() {
 		if (isProcessing) {
@@ -18,25 +27,28 @@
 		$('#wti-progress-wrap').show();
 		$('#wti-log-output').text('');
 		updateProgress({ total: 0, processed: 0 });
-		updateStatus('Preparing Totobi feed...');
-		addLog('Preparing Totobi feed...');
+		updateStatus(t('preparing', 'Preparing Totobi feed...'));
+		addLog(t('preparing', 'Preparing Totobi feed...'));
 
 		$.post(wtiAdmin.ajaxUrl, {
 			action: 'wti_start_import',
 			_wpnonce: wtiAdmin.nonce
 		}).done(function (response) {
 			if (!response.success) {
-				addLog('ERROR: ' + (response.data || 'Cannot start sync'));
+				addLog(t('errorPrefix', 'ERROR:') + ' ' + (response.data || t('cannotStart', 'Cannot start sync')));
 				resetUi();
 				return;
 			}
 
 			updateProgress(response.data);
-			updateStatus('Sync started. Processing first batch...');
-			addLog('Sync started. Products: ' + response.data.total + ', catalog: ' + response.data.catalog_date);
+			updateStatus(t('syncStarted', 'Sync started. Processing first batch...'));
+			addLog(t('startedLog', 'Sync started. Products: %total%, catalog: %catalog%', {
+				total: response.data.total,
+				catalog: response.data.catalog_date
+			}));
 			processBatch();
 		}).fail(function () {
-			addLog('ERROR: AJAX start request failed');
+			addLog(t('errorPrefix', 'ERROR:') + ' ' + t('ajaxStartFailed', 'AJAX start request failed'));
 			resetUi();
 		});
 	}
@@ -46,7 +58,7 @@
 			return;
 		}
 
-		updateStatus('Processing next batch...');
+		updateStatus(t('processingBatch', 'Processing next batch...'));
 
 		$.post(wtiAdmin.ajaxUrl, {
 			action: 'wti_process_batch',
@@ -55,7 +67,7 @@
 			variable_batch_size: 8
 		}).done(function (response) {
 			if (!response.success) {
-				addLog('ERROR: ' + (response.data || 'Batch failed'));
+				addLog(t('errorPrefix', 'ERROR:') + ' ' + (response.data || t('batchFailed', 'Batch failed')));
 				resetUi();
 				return;
 			}
@@ -67,8 +79,8 @@
 			(data.log_entries || []).forEach(addLog);
 
 			if (data.completed) {
-				addLog('Sync completed.');
-				updateStatus('Sync completed.');
+				addLog(t('syncCompleted', 'Sync completed.'));
+				updateStatus(t('syncCompleted', 'Sync completed.'));
 				resetUi();
 				return;
 			}
@@ -76,8 +88,8 @@
 			window.setTimeout(processBatch, 500);
 		}).fail(function () {
 			retryCount++;
-			addLog('ERROR: batch request failed. Retry ' + retryCount + ' in 5 seconds...');
-			updateStatus('Batch request failed. Retrying...');
+			addLog(t('errorPrefix', 'ERROR:') + ' ' + t('retryBatch', 'Batch request failed. Retry %count% in 5 seconds...', { count: retryCount }));
+			updateStatus(t('retrying', 'Batch request failed. Retrying...'));
 			window.setTimeout(processBatch, 5000);
 		});
 	}
@@ -86,8 +98,8 @@
 		isPaused = true;
 		$('#wti-pause-import').hide();
 		$('#wti-resume-import').show();
-		updateStatus('Sync paused.');
-		addLog('Sync paused.');
+		updateStatus(t('syncPaused', 'Sync paused.'));
+		addLog(t('syncPaused', 'Sync paused.'));
 
 		$.post(wtiAdmin.ajaxUrl, {
 			action: 'wti_pause_import',
@@ -99,8 +111,8 @@
 		isPaused = false;
 		$('#wti-pause-import').show();
 		$('#wti-resume-import').hide();
-		updateStatus('Sync resumed. Processing next batch...');
-		addLog('Sync resumed.');
+		updateStatus(t('resumedStatus', 'Sync resumed. Processing next batch...'));
+		addLog(t('syncResumed', 'Sync resumed.'));
 
 		$.post(wtiAdmin.ajaxUrl, {
 			action: 'wti_resume_import',
@@ -143,8 +155,12 @@
 	}
 
 	function statusText(data) {
-		var stage = data.stage === 'variable' ? 'variable products' : 'simple products';
-		return 'Processing ' + stage + ': ' + (data.processed || 0) + ' of ' + (data.total || 0);
+		var stage = data.stage === 'variable' ? t('variableProducts', 'variable products') : t('simpleProducts', 'simple products');
+		return t('processingStage', 'Processing %stage%: %processed% of %total%', {
+			stage: stage,
+			processed: data.processed || 0,
+			total: data.total || 0
+		});
 	}
 
 	function resetUi() {

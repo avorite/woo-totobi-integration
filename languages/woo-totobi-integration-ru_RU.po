@@ -1,0 +1,252 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Woo Totobi Integration 0.1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Totobi Integration"
+msgstr "Интеграция Totobi"
+
+msgid "Import Totobi products, prices, stock, variations, and images into WooCommerce."
+msgstr "Импорт товаров, цен, остатков, вариаций и изображений Totobi в WooCommerce."
+
+msgid "Settings"
+msgstr "Настройки"
+
+msgid "Feed source, categories, schedule, and product update rules."
+msgstr "Источник фида, категории, расписание и правила обновления товаров."
+
+msgid "Prom YML feed URL"
+msgstr "URL Prom YML фида"
+
+msgid "Main YML fallback URL"
+msgstr "Резервный URL основного YML"
+
+msgid "Category mode"
+msgstr "Режим категорий"
+
+msgid "Automatic from client category list"
+msgstr "Автоматически по списку категорий клиента"
+
+msgid "Manual mapping"
+msgstr "Ручное сопоставление"
+
+msgid "Totobi categories"
+msgstr "Категории Totobi"
+
+msgid "WooCommerce category mapping"
+msgstr "Сопоставление категорий WooCommerce"
+
+msgid "Markup percent"
+msgstr "Процент наценки"
+
+msgid "First sync time"
+msgstr "Время первой синхронизации"
+
+msgid "Next automatic run: %s"
+msgstr "Следующий автоматический запуск: %s"
+
+msgid "Automatic sync is not scheduled yet."
+msgstr "Автоматическая синхронизация еще не запланирована."
+
+msgid "Sync interval"
+msgstr "Интервал синхронизации"
+
+msgid "Every 4 hours"
+msgstr "Каждые 4 часа"
+
+msgid "Every 6 hours"
+msgstr "Каждые 6 часов"
+
+msgid "Daily"
+msgstr "Ежедневно"
+
+msgid "Totobi Prom YML is checked on this interval. If the catalog date has not changed, the automatic sync is skipped."
+msgstr "Prom YML Totobi проверяется с этим интервалом. Если дата каталога не изменилась, автоматическая синхронизация пропускается."
+
+msgid "Product update mode"
+msgstr "Режим обновления товаров"
+
+msgid "Products are published automatically. Images are imported from Totobi and unchanged products are skipped."
+msgstr "Товары публикуются автоматически. Изображения импортируются из Totobi, а неизмененные товары пропускаются."
+
+msgid "Save settings"
+msgstr "Сохранить настройки"
+
+msgid "Manual sync"
+msgstr "Ручная синхронизация"
+
+msgid "Starts the Totobi update now. Progress is shown live while product data and images are processed in small batches."
+msgstr "Запускает обновление Totobi сейчас. Прогресс отображается вживую, пока данные товаров и изображения обрабатываются небольшими пакетами."
+
+msgid "Start sync"
+msgstr "Запустить синхронизацию"
+
+msgid "Pause"
+msgstr "Пауза"
+
+msgid "Resume"
+msgstr "Продолжить"
+
+msgid "Waiting to start"
+msgstr "Ожидание запуска"
+
+msgid "processed"
+msgstr "обработано"
+
+msgid "simple updated"
+msgstr "простых обновлено"
+
+msgid "variable updated"
+msgstr "вариативных обновлено"
+
+msgid "variations updated"
+msgstr "вариаций обновлено"
+
+msgid "images downloaded"
+msgstr "изображений загружено"
+
+msgid "unchanged skipped"
+msgstr "неизмененных пропущено"
+
+msgid "errors"
+msgstr "ошибок"
+
+msgid "Last sync"
+msgstr "Последняя синхронизация"
+
+msgid "Short result from the most recent import run."
+msgstr "Краткий результат последнего запуска импорта."
+
+msgid "Recent log"
+msgstr "Последние события"
+
+msgid "Latest technical events in a readable format."
+msgstr "Последние технические события в понятном виде."
+
+msgid "Status"
+msgstr "Статус"
+
+msgid "Finished"
+msgstr "Завершено"
+
+msgid "Catalog date"
+msgstr "Дата каталога"
+
+msgid "Created"
+msgstr "Создано"
+
+msgid "Updated"
+msgstr "Обновлено"
+
+msgid "Unchanged"
+msgstr "Без изменений"
+
+msgid "Images"
+msgstr "Изображения"
+
+msgid "Errors"
+msgstr "Ошибки"
+
+msgid "No log entries yet."
+msgstr "Записей журнала пока нет."
+
+msgid "Log"
+msgstr "Журнал"
+
+msgid "Technical details recorded."
+msgstr "Технические детали записаны."
+
+msgid "Completed"
+msgstr "Завершено"
+
+msgid "Skipped"
+msgstr "Пропущено"
+
+msgid "Error"
+msgstr "Ошибка"
+
+msgid "No sync yet"
+msgstr "Синхронизации еще не было"
+
+msgid "Settings saved."
+msgstr "Настройки сохранены."
+
+msgid "Manual sync check completed."
+msgstr "Проверка ручной синхронизации завершена."
+
+msgid "Manual sync check failed. See log for details."
+msgstr "Проверка ручной синхронизации не удалась. Подробности в журнале."
+
+msgid "Cannot load WooCommerce categories."
+msgstr "Не удалось загрузить категории WooCommerce."
+
+msgid "Totobi ID"
+msgstr "ID Totobi"
+
+msgid "Totobi category"
+msgstr "Категория Totobi"
+
+msgid "Client path"
+msgstr "Путь клиента"
+
+msgid "WooCommerce category"
+msgstr "Категория WooCommerce"
+
+msgid "Do not assign"
+msgstr "Не назначать"
+
+msgid "Insufficient permissions."
+msgstr "Недостаточно прав."
+
+msgid "Preparing Totobi feed..."
+msgstr "Подготовка фида Totobi..."
+
+msgid "Cannot start sync"
+msgstr "Не удалось запустить синхронизацию"
+
+msgid "Sync started. Processing first batch..."
+msgstr "Синхронизация запущена. Обрабатывается первый пакет..."
+
+msgid "Sync started. Products: %total%, catalog: %catalog%"
+msgstr "Синхронизация запущена. Товаров: %total%, каталог: %catalog%"
+
+msgid "AJAX start request failed"
+msgstr "AJAX-запрос запуска не удался"
+
+msgid "Processing next batch..."
+msgstr "Обработка следующего пакета..."
+
+msgid "Batch failed"
+msgstr "Пакет не обработан"
+
+msgid "ERROR:"
+msgstr "ОШИБКА:"
+
+msgid "Sync completed."
+msgstr "Синхронизация завершена."
+
+msgid "Batch request failed. Retry %count% in 5 seconds..."
+msgstr "Запрос пакета не удался. Повтор %count% через 5 секунд..."
+
+msgid "Batch request failed. Retrying..."
+msgstr "Запрос пакета не удался. Повтор..."
+
+msgid "Sync paused."
+msgstr "Синхронизация приостановлена."
+
+msgid "Sync resumed."
+msgstr "Синхронизация продолжена."
+
+msgid "Sync resumed. Processing next batch..."
+msgstr "Синхронизация продолжена. Обрабатывается следующий пакет..."
+
+msgid "simple products"
+msgstr "простые товары"
+
+msgid "variable products"
+msgstr "вариативные товары"
+
+msgid "Processing %stage%: %processed% of %total%"
+msgstr "Обработка: %stage%, %processed% из %total%"
+

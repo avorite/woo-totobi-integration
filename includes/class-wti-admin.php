@@ -84,6 +84,25 @@ class WTI_Admin {
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'wti_ajax_nonce' ),
+				'strings' => array(
+					'preparing'       => __( 'Preparing Totobi feed...', WTI_TEXT_DOMAIN ),
+					'cannotStart'     => __( 'Cannot start sync', WTI_TEXT_DOMAIN ),
+					'syncStarted'     => __( 'Sync started. Processing first batch...', WTI_TEXT_DOMAIN ),
+					'startedLog'      => __( 'Sync started. Products: %total%, catalog: %catalog%', WTI_TEXT_DOMAIN ),
+					'ajaxStartFailed' => __( 'AJAX start request failed', WTI_TEXT_DOMAIN ),
+					'processingBatch' => __( 'Processing next batch...', WTI_TEXT_DOMAIN ),
+					'batchFailed'     => __( 'Batch failed', WTI_TEXT_DOMAIN ),
+					'errorPrefix'     => __( 'ERROR:', WTI_TEXT_DOMAIN ),
+					'syncCompleted'   => __( 'Sync completed.', WTI_TEXT_DOMAIN ),
+					'retryBatch'      => __( 'Batch request failed. Retry %count% in 5 seconds...', WTI_TEXT_DOMAIN ),
+					'retrying'        => __( 'Batch request failed. Retrying...', WTI_TEXT_DOMAIN ),
+					'syncPaused'      => __( 'Sync paused.', WTI_TEXT_DOMAIN ),
+					'syncResumed'     => __( 'Sync resumed.', WTI_TEXT_DOMAIN ),
+					'resumedStatus'   => __( 'Sync resumed. Processing next batch...', WTI_TEXT_DOMAIN ),
+					'simpleProducts'  => __( 'simple products', WTI_TEXT_DOMAIN ),
+					'variableProducts'=> __( 'variable products', WTI_TEXT_DOMAIN ),
+					'processingStage' => __( 'Processing %stage%: %processed% of %total%', WTI_TEXT_DOMAIN ),
+				),
 			)
 		);
 	}
@@ -153,7 +172,10 @@ class WTI_Admin {
 
 		?>
 		<div class="wrap wti-admin">
-			<h1><?php esc_html_e( 'Totobi Integration', WTI_TEXT_DOMAIN ); ?></h1>
+			<div class="wti-page-header">
+				<h1><?php esc_html_e( 'Totobi Integration', WTI_TEXT_DOMAIN ); ?></h1>
+				<p><?php esc_html_e( 'Import Totobi products, prices, stock, variations, and images into WooCommerce.', WTI_TEXT_DOMAIN ); ?></p>
+			</div>
 
 			<?php if ( $notice ) : ?>
 				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( self::notice_text( $notice ) ); ?></p></div>
@@ -161,9 +183,13 @@ class WTI_Admin {
 
 			<?php self::render_manual_sync_panel(); ?>
 
-			<form method="post" action="">
+			<form class="wti-settings-panel" method="post" action="">
 				<?php wp_nonce_field( 'wti_admin_action', 'wti_nonce' ); ?>
 				<input type="hidden" name="wti_action" value="save_settings">
+				<div class="wti-section-heading">
+					<h2><?php esc_html_e( 'Settings', WTI_TEXT_DOMAIN ); ?></h2>
+					<p><?php esc_html_e( 'Feed source, categories, schedule, and product update rules.', WTI_TEXT_DOMAIN ); ?></p>
+				</div>
 
 				<table class="form-table" role="presentation">
 					<tr>
@@ -226,11 +252,23 @@ class WTI_Admin {
 				<?php submit_button( __( 'Save settings', WTI_TEXT_DOMAIN ) ); ?>
 			</form>
 
-			<h2><?php esc_html_e( 'Last sync', WTI_TEXT_DOMAIN ); ?></h2>
-			<?php self::render_last_sync_summary( $last_result ); ?>
+			<div class="wti-bottom-grid">
+				<section class="wti-card">
+					<div class="wti-section-heading">
+						<h2><?php esc_html_e( 'Last sync', WTI_TEXT_DOMAIN ); ?></h2>
+						<p><?php esc_html_e( 'Short result from the most recent import run.', WTI_TEXT_DOMAIN ); ?></p>
+					</div>
+					<?php self::render_last_sync_summary( $last_result ); ?>
+				</section>
 
-			<h2><?php esc_html_e( 'Log tail', WTI_TEXT_DOMAIN ); ?></h2>
-			<?php self::render_log_summary(); ?>
+				<section class="wti-card">
+					<div class="wti-section-heading">
+						<h2><?php esc_html_e( 'Recent log', WTI_TEXT_DOMAIN ); ?></h2>
+						<p><?php esc_html_e( 'Latest technical events in a readable format.', WTI_TEXT_DOMAIN ); ?></p>
+					</div>
+					<?php self::render_log_summary(); ?>
+				</section>
+			</div>
 		</div>
 		<?php
 	}
@@ -257,9 +295,9 @@ class WTI_Admin {
 					<div><span id="wti-stat-updated-simple">0</span><small><?php esc_html_e( 'simple updated', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-updated-variable">0</span><small><?php esc_html_e( 'variable updated', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-updated-variation">0</span><small><?php esc_html_e( 'variations updated', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><span id="wti-stat-images">0</span><small><?php esc_html_e( 'images downloaded', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><span id="wti-stat-skipped">0</span><small><?php esc_html_e( 'unchanged skipped', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><span id="wti-stat-errors">0</span><small><?php esc_html_e( 'errors', WTI_TEXT_DOMAIN ); ?></small></div>
+					<div><span id="wti-stat-images">0</span><small><?php esc_html_e( 'images downloaded', WTI_TEXT_DOMAIN ); ?></small></div>
+					<div><span id="wti-stat-skipped">0</span><small><?php esc_html_e( 'unchanged skipped', WTI_TEXT_DOMAIN ); ?></small></div>
+					<div><span id="wti-stat-errors">0</span><small><?php esc_html_e( 'errors', WTI_TEXT_DOMAIN ); ?></small></div>
 				</div>
 				<div id="wti-log-output" class="wti-log-list"></div>
 			</div>
@@ -272,17 +310,21 @@ class WTI_Admin {
 		$status    = isset( $last_result['status'] ) ? $last_result['status'] : 'none';
 		$updated   = isset( $last_result['updated'] ) ? (int) $last_result['updated'] : 0;
 		$errors    = isset( $last_result['errors'] ) ? (int) $last_result['errors'] : 0;
+		$created   = isset( $last_result['created'] ) ? (int) $last_result['created'] : 0;
+		$skipped   = isset( $execution['skipped_unchanged'] ) ? (int) $execution['skipped_unchanged'] : 0;
 		?>
 		<div class="wti-summary">
-			<div><strong><?php echo esc_html( strtoupper( $status ) ); ?></strong><small><?php esc_html_e( 'status', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><strong><?php echo esc_html( isset( $last_result['finished_at'] ) ? $last_result['finished_at'] : '-' ); ?></strong><small><?php esc_html_e( 'finished', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><strong><?php echo esc_html( isset( $last_result['catalog_date'] ) ? $last_result['catalog_date'] : '-' ); ?></strong><small><?php esc_html_e( 'catalog', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><strong><?php echo esc_html( $updated ); ?></strong><small><?php esc_html_e( 'updated records', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><strong><?php echo esc_html( isset( $execution['imported_images'] ) ? (int) $execution['imported_images'] : 0 ); ?></strong><small><?php esc_html_e( 'images downloaded', WTI_TEXT_DOMAIN ); ?></small></div>
-			<div><strong><?php echo esc_html( $errors ); ?></strong><small><?php esc_html_e( 'errors', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><span class="<?php echo esc_attr( self::status_badge_class( $status ) ); ?>"><?php echo esc_html( self::status_label( $status ) ); ?></span><small><?php esc_html_e( 'Status', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( isset( $last_result['finished_at'] ) ? $last_result['finished_at'] : '-' ); ?></strong><small><?php esc_html_e( 'Finished', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( isset( $last_result['catalog_date'] ) ? $last_result['catalog_date'] : '-' ); ?></strong><small><?php esc_html_e( 'Catalog date', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( $created ); ?></strong><small><?php esc_html_e( 'Created', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( $updated ); ?></strong><small><?php esc_html_e( 'Updated', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( $skipped ); ?></strong><small><?php esc_html_e( 'Unchanged', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( isset( $execution['imported_images'] ) ? (int) $execution['imported_images'] : 0 ); ?></strong><small><?php esc_html_e( 'Images', WTI_TEXT_DOMAIN ); ?></small></div>
+			<div><strong><?php echo esc_html( $errors ); ?></strong><small><?php esc_html_e( 'Errors', WTI_TEXT_DOMAIN ); ?></small></div>
 		</div>
 		<?php if ( ! empty( $last_result['message'] ) ) : ?>
-			<p class="description"><?php echo esc_html( $last_result['message'] ); ?></p>
+			<p class="wti-result-message"><?php echo esc_html( self::clean_log_message( $last_result['message'] ) ); ?></p>
 		<?php endif; ?>
 		<?php
 	}
@@ -296,11 +338,64 @@ class WTI_Admin {
 			return;
 		}
 
-		echo '<ul class="wti-log-tail">';
+		echo '<ol class="wti-log-tail">';
 		foreach ( $lines as $line ) {
-			echo '<li>' . esc_html( wp_html_excerpt( $line, 220, '...' ) ) . '</li>';
+			$entry = self::format_log_line( $line );
+			echo '<li>';
+			echo '<span class="wti-log-time">' . esc_html( $entry['time'] ) . '</span>';
+			echo '<span class="wti-log-message">' . esc_html( $entry['message'] ) . '</span>';
+			echo '</li>';
 		}
-		echo '</ul>';
+		echo '</ol>';
+	}
+
+	private static function format_log_line( $line ) {
+		$entry = array(
+			'time'    => '',
+			'message' => trim( (string) $line ),
+		);
+
+		if ( preg_match( '/^\[([^\]]+)\]\s*(.*)$/', $entry['message'], $matches ) ) {
+			$entry['time']    = $matches[1];
+			$entry['message'] = $matches[2];
+		}
+
+		$entry['message'] = self::clean_log_message( $entry['message'] );
+
+		if ( '' === $entry['time'] ) {
+			$entry['time'] = __( 'Log', WTI_TEXT_DOMAIN );
+		}
+
+		return $entry;
+	}
+
+	private static function clean_log_message( $message ) {
+		$message = preg_replace( '/\s*\{.*$/', '', (string) $message );
+		$message = trim( $message );
+
+		if ( '' === $message ) {
+			return __( 'Technical details recorded.', WTI_TEXT_DOMAIN );
+		}
+
+		return wp_html_excerpt( $message, 180, '...' );
+	}
+
+	private static function status_label( $status ) {
+		$labels = array(
+			'ok'        => __( 'Completed', WTI_TEXT_DOMAIN ),
+			'completed' => __( 'Completed', WTI_TEXT_DOMAIN ),
+			'skipped'   => __( 'Skipped', WTI_TEXT_DOMAIN ),
+			'error'     => __( 'Error', WTI_TEXT_DOMAIN ),
+			'none'      => __( 'No sync yet', WTI_TEXT_DOMAIN ),
+		);
+
+		return isset( $labels[ $status ] ) ? $labels[ $status ] : ucfirst( (string) $status );
+	}
+
+	private static function status_badge_class( $status ) {
+		$status = in_array( $status, array( 'ok', 'completed', 'skipped', 'error' ), true ) ? $status : 'none';
+
+		return 'wti-status-badge wti-status-' . $status;
 	}
 
 	private static function notice_text( $notice ) {

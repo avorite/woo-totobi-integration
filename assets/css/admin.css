@@ -1,15 +1,45 @@
-.wti-admin .wti-path {
-	display: block;
-	margin: 0 0 6px;
+.wti-admin {
+	max-width: 1280px;
+	color: #1d2327;
 }
 
-.wti-admin .wti-import-panel {
-	max-width: 1120px;
-	margin: 18px 0 28px;
+.wti-admin .wti-page-header {
+	margin: 16px 0 18px;
+}
+
+.wti-admin .wti-page-header h1 {
+	margin-bottom: 4px;
+}
+
+.wti-admin .wti-page-header p,
+.wti-admin .wti-section-heading p {
+	max-width: 760px;
+	margin: 0;
+	color: #646970;
+}
+
+.wti-admin .wti-import-panel,
+.wti-admin .wti-settings-panel,
+.wti-admin .wti-card {
+	box-sizing: border-box;
+	max-width: 1180px;
+	margin: 18px 0;
 	padding: 18px 20px;
 	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.wti-admin .wti-section-heading {
+	margin-bottom: 14px;
+}
+
+.wti-admin .wti-section-heading h2,
+.wti-admin .wti-panel-header h2 {
+	margin: 0 0 4px;
+	font-size: 16px;
+	line-height: 1.35;
 }
 
 .wti-admin .wti-panel-header {
@@ -19,12 +49,9 @@
 	justify-content: space-between;
 }
 
-.wti-admin .wti-panel-header h2 {
-	margin-top: 0;
-}
-
 .wti-admin .wti-actions {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 8px;
 	min-width: 220px;
 	justify-content: flex-end;
@@ -36,17 +63,17 @@
 
 .wti-admin .wti-progress-status {
 	display: flex;
+	gap: 12px;
 	justify-content: space-between;
 	margin-bottom: 8px;
 	font-weight: 600;
 }
 
 .wti-admin .wti-progress {
-	height: 18px;
+	height: 14px;
 	overflow: hidden;
 	background: #f0f0f1;
-	border: 1px solid #c3c4c7;
-	border-radius: 3px;
+	border-radius: 999px;
 }
 
 .wti-admin .wti-progress-bar {
@@ -59,62 +86,154 @@
 .wti-admin .wti-metric-grid,
 .wti-admin .wti-summary {
 	display: grid;
-	grid-template-columns: repeat(6, minmax(120px, 1fr));
+	grid-template-columns: repeat(4, minmax(130px, 1fr));
 	gap: 10px;
 	margin: 14px 0;
 }
 
 .wti-admin .wti-metric-grid div,
 .wti-admin .wti-summary div {
+	min-height: 58px;
 	padding: 12px;
 	background: #f6f7f7;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
+	border: 1px solid #edf0f2;
+	border-radius: 6px;
 }
 
 .wti-admin .wti-metric-grid span,
 .wti-admin .wti-summary strong {
 	display: block;
-	font-size: 18px;
+	font-size: 19px;
 	line-height: 1.25;
+	color: #101517;
 }
 
 .wti-admin .wti-metric-grid small,
 .wti-admin .wti-summary small {
 	display: block;
-	margin-top: 4px;
+	margin-top: 5px;
 	color: #646970;
 }
 
-.wti-admin .wti-log-list,
-.wti-admin .wti-log-tail {
-	box-sizing: border-box;
-	max-width: 1120px;
+.wti-admin .wti-status-badge {
+	display: inline-flex;
+	align-items: center;
+	min-height: 24px;
+	padding: 0 9px;
+	font-weight: 600;
+	border-radius: 999px;
+}
+
+.wti-admin .wti-status-ok,
+.wti-admin .wti-status-completed {
+	color: #0a5f38;
+	background: #dff5e8;
+}
+
+.wti-admin .wti-status-skipped,
+.wti-admin .wti-status-none {
+	color: #5c4300;
+	background: #fff3cd;
+}
+
+.wti-admin .wti-status-error {
+	color: #8a2424;
+	background: #f8d7da;
+}
+
+.wti-admin .wti-result-message {
 	margin: 10px 0 0;
-	padding: 10px 12px;
-	overflow: auto;
-	background: #fff;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
+	color: #50575e;
+}
+
+.wti-admin .wti-bottom-grid {
+	display: grid;
+	grid-template-columns: minmax(360px, 1fr) minmax(420px, 1.2fr);
+	gap: 18px;
+	max-width: 1180px;
+	align-items: start;
+}
+
+.wti-admin .wti-bottom-grid .wti-card {
+	margin: 0;
+	max-width: none;
 }
 
 .wti-admin .wti-log-list {
+	box-sizing: border-box;
 	max-height: 220px;
+	margin-top: 12px;
+	padding: 10px 12px;
+	overflow: auto;
+	background: #fbfbfc;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
 	font-family: Consolas, Monaco, monospace;
 	font-size: 12px;
 }
 
 .wti-admin .wti-log-list div {
-	padding: 3px 0;
-	border-bottom: 1px solid #f0f0f1;
+	padding: 4px 0;
+	border-bottom: 1px solid #edf0f2;
+}
+
+.wti-admin .wti-log-list div:last-child {
+	border-bottom: 0;
 }
 
 .wti-admin .wti-log-tail {
-	list-style: disc;
-	padding-left: 28px;
+	display: grid;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 
-@media (max-width: 900px) {
+.wti-admin .wti-log-tail li {
+	display: grid;
+	grid-template-columns: 146px minmax(0, 1fr);
+	gap: 12px;
+	padding: 10px 0;
+	border-bottom: 1px solid #edf0f2;
+}
+
+.wti-admin .wti-log-tail li:last-child {
+	border-bottom: 0;
+}
+
+.wti-admin .wti-log-time {
+	color: #646970;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.wti-admin .wti-log-message {
+	min-width: 0;
+	color: #1d2327;
+	overflow-wrap: anywhere;
+}
+
+.wti-admin .wti-path {
+	display: block;
+	margin: 0 0 6px;
+}
+
+.wti-admin .wti-category-map select {
+	max-width: 100%;
+}
+
+@media (max-width: 1100px) {
+	.wti-admin .wti-bottom-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.wti-admin .wti-metric-grid,
+	.wti-admin .wti-summary {
+		grid-template-columns: repeat(2, minmax(130px, 1fr));
+	}
+}
+
+@media (max-width: 700px) {
 	.wti-admin .wti-panel-header {
 		display: block;
 	}
@@ -125,7 +244,8 @@
 	}
 
 	.wti-admin .wti-metric-grid,
-	.wti-admin .wti-summary {
-		grid-template-columns: repeat(2, minmax(120px, 1fr));
+	.wti-admin .wti-summary,
+	.wti-admin .wti-log-tail li {
+		grid-template-columns: 1fr;
 	}
 }

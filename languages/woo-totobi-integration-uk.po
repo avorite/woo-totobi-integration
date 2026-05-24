@@ -1,0 +1,252 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Woo Totobi Integration 0.1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Totobi Integration"
+msgstr "Інтеграція Totobi"
+
+msgid "Import Totobi products, prices, stock, variations, and images into WooCommerce."
+msgstr "Імпорт товарів, цін, залишків, варіацій та зображень Totobi у WooCommerce."
+
+msgid "Settings"
+msgstr "Налаштування"
+
+msgid "Feed source, categories, schedule, and product update rules."
+msgstr "Джерело фіда, категорії, розклад і правила оновлення товарів."
+
+msgid "Prom YML feed URL"
+msgstr "URL Prom YML фіда"
+
+msgid "Main YML fallback URL"
+msgstr "Резервний URL основного YML"
+
+msgid "Category mode"
+msgstr "Режим категорій"
+
+msgid "Automatic from client category list"
+msgstr "Автоматично за списком категорій клієнта"
+
+msgid "Manual mapping"
+msgstr "Ручне зіставлення"
+
+msgid "Totobi categories"
+msgstr "Категорії Totobi"
+
+msgid "WooCommerce category mapping"
+msgstr "Зіставлення категорій WooCommerce"
+
+msgid "Markup percent"
+msgstr "Відсоток націнки"
+
+msgid "First sync time"
+msgstr "Час першої синхронізації"
+
+msgid "Next automatic run: %s"
+msgstr "Наступний автоматичний запуск: %s"
+
+msgid "Automatic sync is not scheduled yet."
+msgstr "Автоматичну синхронізацію ще не заплановано."
+
+msgid "Sync interval"
+msgstr "Інтервал синхронізації"
+
+msgid "Every 4 hours"
+msgstr "Кожні 4 години"
+
+msgid "Every 6 hours"
+msgstr "Кожні 6 годин"
+
+msgid "Daily"
+msgstr "Щодня"
+
+msgid "Totobi Prom YML is checked on this interval. If the catalog date has not changed, the automatic sync is skipped."
+msgstr "Prom YML Totobi перевіряється з цим інтервалом. Якщо дата каталогу не змінилася, автоматична синхронізація пропускається."
+
+msgid "Product update mode"
+msgstr "Режим оновлення товарів"
+
+msgid "Products are published automatically. Images are imported from Totobi and unchanged products are skipped."
+msgstr "Товари публікуються автоматично. Зображення імпортуються з Totobi, а незмінені товари пропускаються."
+
+msgid "Save settings"
+msgstr "Зберегти налаштування"
+
+msgid "Manual sync"
+msgstr "Ручна синхронізація"
+
+msgid "Starts the Totobi update now. Progress is shown live while product data and images are processed in small batches."
+msgstr "Запускає оновлення Totobi зараз. Прогрес показується наживо, поки дані товарів і зображення обробляються малими пакетами."
+
+msgid "Start sync"
+msgstr "Запустити синхронізацію"
+
+msgid "Pause"
+msgstr "Пауза"
+
+msgid "Resume"
+msgstr "Продовжити"
+
+msgid "Waiting to start"
+msgstr "Очікування запуску"
+
+msgid "processed"
+msgstr "оброблено"
+
+msgid "simple updated"
+msgstr "простих оновлено"
+
+msgid "variable updated"
+msgstr "варіативних оновлено"
+
+msgid "variations updated"
+msgstr "варіацій оновлено"
+
+msgid "images downloaded"
+msgstr "зображень завантажено"
+
+msgid "unchanged skipped"
+msgstr "незмінених пропущено"
+
+msgid "errors"
+msgstr "помилок"
+
+msgid "Last sync"
+msgstr "Остання синхронізація"
+
+msgid "Short result from the most recent import run."
+msgstr "Короткий результат останнього запуску імпорту."
+
+msgid "Recent log"
+msgstr "Останні події"
+
+msgid "Latest technical events in a readable format."
+msgstr "Останні технічні події у зрозумілому вигляді."
+
+msgid "Status"
+msgstr "Статус"
+
+msgid "Finished"
+msgstr "Завершено"
+
+msgid "Catalog date"
+msgstr "Дата каталогу"
+
+msgid "Created"
+msgstr "Створено"
+
+msgid "Updated"
+msgstr "Оновлено"
+
+msgid "Unchanged"
+msgstr "Без змін"
+
+msgid "Images"
+msgstr "Зображення"
+
+msgid "Errors"
+msgstr "Помилки"
+
+msgid "No log entries yet."
+msgstr "Записів журналу ще немає."
+
+msgid "Log"
+msgstr "Журнал"
+
+msgid "Technical details recorded."
+msgstr "Технічні деталі записано."
+
+msgid "Completed"
+msgstr "Завершено"
+
+msgid "Skipped"
+msgstr "Пропущено"
+
+msgid "Error"
+msgstr "Помилка"
+
+msgid "No sync yet"
+msgstr "Синхронізації ще не було"
+
+msgid "Settings saved."
+msgstr "Налаштування збережено."
+
+msgid "Manual sync check completed."
+msgstr "Перевірку ручної синхронізації завершено."
+
+msgid "Manual sync check failed. See log for details."
+msgstr "Перевірка ручної синхронізації не вдалася. Деталі в журналі."
+
+msgid "Cannot load WooCommerce categories."
+msgstr "Не вдалося завантажити категорії WooCommerce."
+
+msgid "Totobi ID"
+msgstr "ID Totobi"
+
+msgid "Totobi category"
+msgstr "Категорія Totobi"
+
+msgid "Client path"
+msgstr "Шлях клієнта"
+
+msgid "WooCommerce category"
+msgstr "Категорія WooCommerce"
+
+msgid "Do not assign"
+msgstr "Не призначати"
+
+msgid "Insufficient permissions."
+msgstr "Недостатньо прав."
+
+msgid "Preparing Totobi feed..."
+msgstr "Підготовка фіда Totobi..."
+
+msgid "Cannot start sync"
+msgstr "Не вдалося запустити синхронізацію"
+
+msgid "Sync started. Processing first batch..."
+msgstr "Синхронізацію запущено. Обробляється перший пакет..."
+
+msgid "Sync started. Products: %total%, catalog: %catalog%"
+msgstr "Синхронізацію запущено. Товарів: %total%, каталог: %catalog%"
+
+msgid "AJAX start request failed"
+msgstr "AJAX-запит запуску не вдався"
+
+msgid "Processing next batch..."
+msgstr "Обробка наступного пакета..."
+
+msgid "Batch failed"
+msgstr "Пакет не оброблено"
+
+msgid "ERROR:"
+msgstr "ПОМИЛКА:"
+
+msgid "Sync completed."
+msgstr "Синхронізацію завершено."
+
+msgid "Batch request failed. Retry %count% in 5 seconds..."
+msgstr "Запит пакета не вдався. Повтор %count% через 5 секунд..."
+
+msgid "Batch request failed. Retrying..."
+msgstr "Запит пакета не вдався. Повтор..."
+
+msgid "Sync paused."
+msgstr "Синхронізацію призупинено."
+
+msgid "Sync resumed."
+msgstr "Синхронізацію продовжено."
+
+msgid "Sync resumed. Processing next batch..."
+msgstr "Синхронізацію продовжено. Обробляється наступний пакет..."
+
+msgid "simple products"
+msgstr "прості товари"
+
+msgid "variable products"
+msgstr "варіативні товари"
+
+msgid "Processing %stage%: %processed% of %total%"
+msgstr "Обробка: %stage%, %processed% із %total%"
+
