@@ -12,6 +12,7 @@ class WTI_Admin {
 			'sync_time'       => '15:00',
 			'dry_run'         => 'yes',
 			'import_limit'    => 10,
+			'variable_limit'  => 1,
 			'product_status'  => 'draft',
 			'selected_paths'  => self::get_default_totobi_paths(),
 			'category_map'    => array(),
@@ -114,6 +115,7 @@ class WTI_Admin {
 			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '15:00',
 			'dry_run'        => empty( $_POST['dry_run'] ) ? 'no' : 'yes',
 			'import_limit'   => isset( $_POST['import_limit'] ) ? max( 1, absint( wp_unslash( $_POST['import_limit'] ) ) ) : 10,
+			'variable_limit' => isset( $_POST['variable_limit'] ) ? max( 0, absint( wp_unslash( $_POST['variable_limit'] ) ) ) : 1,
 			'product_status' => isset( $_POST['product_status'] ) && in_array( $_POST['product_status'], array( 'draft', 'publish' ), true ) ? sanitize_key( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 			'selected_paths' => $paths ? $paths : self::get_default_totobi_paths(),
 			'category_map'   => self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ),
@@ -203,6 +205,13 @@ class WTI_Admin {
 						<td>
 							<input type="number" min="1" max="100" id="import_limit" name="import_limit" value="<?php echo esc_attr( $settings['import_limit'] ); ?>">
 							<p class="description"><?php esc_html_e( 'Only simple products are writable at this stage. Variations and images are still skipped.', WTI_TEXT_DOMAIN ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="variable_limit"><?php esc_html_e( 'Variable product write limit', WTI_TEXT_DOMAIN ); ?></label></th>
+						<td>
+							<input type="number" min="0" max="20" id="variable_limit" name="variable_limit" value="<?php echo esc_attr( $settings['variable_limit'] ); ?>">
+							<p class="description"><?php esc_html_e( 'Controls how many variable parent products are written per run. All valid variations for those parents are written.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 					<tr>

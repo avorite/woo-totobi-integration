@@ -73,6 +73,7 @@ class WTI_Product_Sync {
 			array(
 				'dry_run'        => true,
 				'import_limit'   => 10,
+				'variable_limit' => 1,
 				'product_status' => 'draft',
 			)
 		);
@@ -85,24 +86,31 @@ class WTI_Product_Sync {
 			);
 		}
 
-		if ( ! class_exists( 'WC_Product_Simple' ) ) {
+		if ( ! class_exists( 'WC_Product_Simple' ) || ! class_exists( 'WC_Product_Variable' ) || ! class_exists( 'WC_Product_Variation' ) ) {
 			return new WP_Error( 'wti_woocommerce_missing', 'WooCommerce product classes are not available.' );
 		}
 
-		$limit   = max( 1, absint( $args['import_limit'] ) );
-		$status  = in_array( $args['product_status'], array( 'draft', 'publish' ), true ) ? $args['product_status'] : 'draft';
-		$result  = array(
-			'status'           => 'written',
-			'processed'        => 0,
-			'created_simple'   => 0,
-			'updated_simple'   => 0,
-			'skipped_variable' => count( $actions['variable'] ),
-			'skipped_variation' => count( $actions['variations'] ),
-			'errors'           => array(),
+		$simple_limit   = max( 0, absint( $args['import_limit'] ) );
+		$variable_limit = max( 0, absint( $args['variable_limit'] ) );
+		$status         = in_array( $args['product_status'], array( 'draft', 'publish' ), true ) ? $args['product_status'] : 'draft';
+		$result         = array(
+			'status'             => 'written',
+			'processed'          => 0,
+			'created_simple'     => 0,
+			'updated_simple'     => 0,
+			'created_variable'   => 0,
+			'updated_variable'   => 0,
+			'created_variation'  => 0,
+			'updated_variation'  => 0,
+			'skipped_simple'     => 0,
+			'skipped_variable'   => 0,
+			'skipped_variation'  => 0,
+			'errors'             => array(),
 		);
 
 		foreach ( $actions['simple'] as $action ) {
-			if ( $result['processed'] >= $limit ) {
+			if ( $result['created_simple'] + $result['updated_simple'] >= $simple_limit ) {
+				$result['skipped_simple']++;
 				break;
 			}
 
@@ -125,6 +133,58 @@ class WTI_Product_Sync {
 				$result['updated_simple']++;
 			}
 		}
+
+		$variation_actions = self::index_variation_actions_by_group( $actions['variations'] );
+
+		foreach ( $actions['variable'] as $action ) {
+			if ( $result['created_variable'] + $result['updated_variable'] >= $variable_limit ) {
+				$result['skipped_variable']++;
+				continue;
+			}
+
+			$write = self::write_variable_product( $action, $status );
+
+			if ( is_wp_error( $write ) ) {
+				$result['errors'][] = array(
+					'action' => $action['action'],
+					'sku'    => $action['sku'],
+					'error'  => $write->get_error_message(),
+				);
+				continue;
+			}
+
+			$result['processed']++;
+
+			if ( 'create_variable' === $action['action'] ) {
+				$result['created_variable']++;
+			} else {
+				$result['updated_variable']++;
+			}
+
+			$group_variations = isset( $variation_actions[ $action['group_id'] ] ) ? $variation_actions[ $action['group_id'] ] : array();
+
+			foreach ( $group_variations as $variation_action ) {
+				$variation_action['parent_id'] = $write['product_id'];
+				$variation_write               = self::write_variation( $variation_action );
+
+				if ( is_wp_error( $variation_write ) ) {
+					$result['errors'][] = array(
+						'action' => $variation_action['action'],
+						'sku'    => $variation_action['sku'],
+						'error'  => $variation_write->get_error_message(),
+					);
+					continue;
+				}
+
+				if ( 'create_variation' === $variation_action['action'] ) {
+					$result['created_variation']++;
+				} else {
+					$result['updated_variation']++;
+				}
+			}
+		}
+
+		$result['skipped_variation'] = max( 0, count( $actions['variations'] ) - $result['created_variation'] - $result['updated_variation'] );
 
 		return $result;
 	}
@@ -188,6 +248,73 @@ class WTI_Product_Sync {
 			);
 		} catch ( Exception $exception ) {
 			return new WP_Error( 'wti_simple_product_write_failed', $exception->getMessage() );
+		}
+	}
+
+	private static function write_variable_product( $action, $status ) {
+		try {
+			$product = ! empty( $action['product_id'] ) ? wc_get_product( $action['product_id'] ) : new WC_Product_Variable();
+
+			if ( ! $product || ! is_a( $product, 'WC_Product_Variable' ) ) {
+				$product = new WC_Product_Variable();
+			}
+
+			$product->set_name( wp_strip_all_tags( $action['name'] ) );
+			$product->set_status( $status );
+			$product->set_catalog_visibility( 'visible' );
+			$product->set_sku( $action['sku'] );
+			$product->set_attributes( self::build_product_attributes( $action['attributes'] ) );
+
+			if ( ! empty( $action['woo_category_ids'] ) ) {
+				$product->set_category_ids( array_map( 'absint', $action['woo_category_ids'] ) );
+			}
+
+			foreach ( $action['meta'] as $key => $value ) {
+				$product->update_meta_data( $key, $value );
+			}
+
+			$product_id = $product->save();
+
+			return array(
+				'product_id' => $product_id,
+			);
+		} catch ( Exception $exception ) {
+			return new WP_Error( 'wti_variable_product_write_failed', $exception->getMessage() );
+		}
+	}
+
+	private static function write_variation( $action ) {
+		try {
+			$variation = ! empty( $action['variation_id'] ) ? wc_get_product( $action['variation_id'] ) : new WC_Product_Variation();
+
+			if ( ! $variation || ! is_a( $variation, 'WC_Product_Variation' ) ) {
+				$variation = new WC_Product_Variation();
+			}
+
+			$variation->set_parent_id( absint( $action['parent_id'] ) );
+			$variation->set_status( 'publish' );
+			$variation->set_regular_price( wc_format_decimal( $action['price'] ) );
+			$variation->set_price( wc_format_decimal( $action['price'] ) );
+			$variation->set_manage_stock( true );
+			$variation->set_stock_quantity( max( 0, (int) $action['stock'] ) );
+			$variation->set_stock_status( $action['stock_status'] );
+			$variation->set_attributes( array_filter( array( 'size' => $action['size'], 'color' => $action['color'] ) ) );
+
+			if ( ! empty( $action['sku'] ) && $variation->get_sku() !== $action['sku'] ) {
+				$variation->set_sku( $action['sku'] );
+			}
+
+			foreach ( $action['meta'] as $key => $value ) {
+				$variation->update_meta_data( $key, $value );
+			}
+
+			$variation_id = $variation->save();
+
+			return array(
+				'variation_id' => $variation_id,
+			);
+		} catch ( Exception $exception ) {
+			return new WP_Error( 'wti_variation_write_failed', $exception->getMessage() );
 		}
 	}
 
@@ -269,6 +396,39 @@ class WTI_Product_Sync {
 			'size'  => array_values( array_unique( $sizes ) ),
 			'color' => array_values( array_unique( $colors ) ),
 		);
+	}
+
+	private static function build_product_attributes( $attributes ) {
+		$product_attributes = array();
+		$position           = 0;
+
+		foreach ( array( 'size' => 'Size', 'color' => 'Color' ) as $key => $label ) {
+			if ( empty( $attributes[ $key ] ) ) {
+				continue;
+			}
+
+			$attribute = new WC_Product_Attribute();
+			$attribute->set_id( 0 );
+			$attribute->set_name( $key );
+			$attribute->set_options( array_values( array_unique( $attributes[ $key ] ) ) );
+			$attribute->set_position( $position++ );
+			$attribute->set_visible( true );
+			$attribute->set_variation( true );
+
+			$product_attributes[ $key ] = $attribute;
+		}
+
+		return $product_attributes;
+	}
+
+	private static function index_variation_actions_by_group( $variation_actions ) {
+		$indexed = array();
+
+		foreach ( $variation_actions as $variation_action ) {
+			$indexed[ $variation_action['group_id'] ][] = $variation_action;
+		}
+
+		return $indexed;
 	}
 
 	private static function find_existing_simple_product_id( $offer ) {

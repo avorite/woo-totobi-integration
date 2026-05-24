@@ -65,6 +65,7 @@ class WTI_Importer {
 			array(
 				'dry_run'        => 'yes' === $settings['dry_run'],
 				'import_limit'   => isset( $settings['import_limit'] ) ? absint( $settings['import_limit'] ) : 10,
+				'variable_limit' => isset( $settings['variable_limit'] ) ? absint( $settings['variable_limit'] ) : 1,
 				'product_status' => isset( $settings['product_status'] ) ? $settings['product_status'] : 'draft',
 			)
 		);
