@@ -520,7 +520,13 @@ class WTI_Product_Sync {
 			return $product_id;
 		}
 
-		return self::find_product_id_by_sku( $offer['sku'] );
+		$product_id = self::find_product_id_by_sku( $offer['sku'] );
+
+		if ( $product_id ) {
+			return $product_id;
+		}
+
+		return self::find_unclaimed_product_id_by_exact_title( $offer['name'] );
 	}
 
 	private static function find_existing_variable_product_id( $variable ) {
@@ -530,7 +536,13 @@ class WTI_Product_Sync {
 			return $product_id;
 		}
 
-		return self::find_product_id_by_sku( $variable['parent']['sku'] );
+		$product_id = self::find_product_id_by_sku( $variable['parent']['sku'] );
+
+		if ( $product_id ) {
+			return $product_id;
+		}
+
+		return self::find_unclaimed_product_id_by_exact_title( $variable['parent']['name'] );
 	}
 
 	private static function find_existing_variation_id( $variation, $parent_id = 0 ) {
@@ -555,6 +567,48 @@ class WTI_Product_Sync {
 		}
 
 		return (int) wc_get_product_id_by_sku( $sku );
+	}
+
+	private static function find_unclaimed_product_id_by_exact_title( $title ) {
+		global $wpdb;
+
+		$title = trim( (string) $title );
+
+		if ( '' === $title ) {
+			return 0;
+		}
+
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_status IN ('publish','draft','pending','private') AND post_title = %s LIMIT 3",
+				'product',
+				$title
+			)
+		);
+
+		if ( empty( $ids ) ) {
+			return 0;
+		}
+
+		$candidates = array();
+
+		foreach ( $ids as $id ) {
+			$id = (int) $id;
+
+			if ( get_post_meta( $id, self::META_OFFER_ID, true ) || get_post_meta( $id, self::META_GROUP_ID, true ) ) {
+				continue;
+			}
+
+			$product = function_exists( 'wc_get_product' ) ? wc_get_product( $id ) : null;
+
+			if ( $product && '' !== (string) $product->get_sku() ) {
+				continue;
+			}
+
+			$candidates[] = $id;
+		}
+
+		return 1 === count( $candidates ) ? (int) $candidates[0] : 0;
 	}
 
 	private static function find_product_id_by_meta( $meta_key, $meta_value, $post_types ) {
