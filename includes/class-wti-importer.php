@@ -52,6 +52,14 @@ class WTI_Importer {
 
 		$plan    = WTI_Parser::build_import_plan( $offers );
 		$summary = WTI_Parser::summarize_plan( $plan );
+		$actions = WTI_Product_Sync::build_action_plan(
+			$plan,
+			array(
+				'dry_run'      => true,
+				'catalog_date' => isset( $meta['date'] ) ? $meta['date'] : '',
+			)
+		);
+		$execution = WTI_Product_Sync::execute_action_plan( $actions, array( 'dry_run' => true ) );
 
 		$result = array(
 			'status'       => 'ok',
@@ -59,6 +67,8 @@ class WTI_Importer {
 			'catalog_date' => isset( $meta['date'] ) ? $meta['date'] : '',
 			'offers'       => count( $offers ),
 			'plan'         => $summary,
+			'actions'      => self::build_action_summary( $actions ),
+			'execution'    => $execution,
 			'validation'   => self::build_validation_summary( $plan ),
 			'examples'     => self::build_examples( $plan ),
 			'created'      => 0,
@@ -71,6 +81,15 @@ class WTI_Importer {
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
 
 		return $result;
+	}
+
+	private static function build_action_summary( $actions ) {
+		return array(
+			'summary'          => isset( $actions['summary'] ) ? $actions['summary'] : array(),
+			'simple_samples'   => isset( $actions['simple'] ) ? array_slice( $actions['simple'], 0, 5 ) : array(),
+			'variable_samples' => isset( $actions['variable'] ) ? array_slice( $actions['variable'], 0, 5 ) : array(),
+			'variation_samples' => isset( $actions['variations'] ) ? array_slice( $actions['variations'], 0, 5 ) : array(),
+		);
 	}
 
 	private static function build_validation_summary( $plan ) {

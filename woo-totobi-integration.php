@@ -27,6 +27,7 @@ $wti_includes = array(
 	'includes/class-wti-logger.php',
 	'includes/class-wti-feed-client.php',
 	'includes/class-wti-parser.php',
+	'includes/class-wti-product-sync.php',
 	'includes/class-wti-importer.php',
 	'includes/class-wti-scheduler.php',
 	'includes/class-wti-admin.php',
@@ -48,4 +49,3 @@ add_action( 'admin_menu', array( 'WTI_Admin', 'add_admin_menu' ) );
 add_action( 'admin_init', array( 'WTI_Admin', 'handle_post_actions' ) );
 add_action( 'admin_enqueue_scripts', array( 'WTI_Admin', 'enqueue_assets' ) );
 add_action( WTI_CRON_HOOK, array( 'WTI_Importer', 'run_scheduled_sync' ) );
-
