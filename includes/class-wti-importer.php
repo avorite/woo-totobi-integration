@@ -59,6 +59,7 @@ class WTI_Importer {
 			'catalog_date' => isset( $meta['date'] ) ? $meta['date'] : '',
 			'offers'       => count( $offers ),
 			'plan'         => $summary,
+			'validation'   => self::build_validation_summary( $plan ),
 			'examples'     => self::build_examples( $plan ),
 			'created'      => 0,
 			'updated'      => 0,
@@ -70,6 +71,17 @@ class WTI_Importer {
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
 
 		return $result;
+	}
+
+	private static function build_validation_summary( $plan ) {
+		$validation = isset( $plan['validation'] ) ? $plan['validation'] : array();
+
+		return array(
+			'invalid_count' => isset( $validation['invalid_count'] ) ? $validation['invalid_count'] : 0,
+			'reasons'       => isset( $validation['reasons'] ) ? $validation['reasons'] : array(),
+			'samples'       => isset( $validation['invalid'] ) ? array_slice( $validation['invalid'], 0, 10 ) : array(),
+			'skipped_groups' => isset( $plan['skipped_groups'] ) ? array_slice( $plan['skipped_groups'], 0, 10 ) : array(),
+		);
 	}
 
 	private static function build_examples( $plan ) {

@@ -113,8 +113,10 @@ class WTI_Parser {
 	}
 
 	public static function build_import_plan( $offers ) {
-		$groups  = array();
-		$simples = array();
+		$validation = self::validate_offers( $offers );
+		$offers     = $validation['valid'];
+		$groups     = array();
+		$simples    = array();
 
 		foreach ( $offers as $offer ) {
 			if ( ! empty( $offer['group_id'] ) ) {
@@ -125,21 +127,34 @@ class WTI_Parser {
 			$simples[] = $offer;
 		}
 
-		$variables = array();
+		$variables      = array();
+		$skipped_groups = array();
 
 		foreach ( $groups as $group_id => $group_offers ) {
-			$parent = self::pick_parent_offer( $group_offers );
+			$parent     = self::pick_parent_offer( $group_offers );
+			$variations = self::sort_variations( $group_offers );
+
+			if ( empty( $variations ) ) {
+				$skipped_groups[] = array(
+					'group_id' => $group_id,
+					'name'     => isset( $parent['name'] ) ? $parent['name'] : '',
+					'reason'   => 'no_valid_variations',
+				);
+				continue;
+			}
 
 			$variables[] = array(
 				'group_id'   => $group_id,
 				'parent'     => $parent,
-				'variations' => self::sort_variations( $group_offers ),
+				'variations' => $variations,
 			);
 		}
 
 		return array(
-			'simple'   => $simples,
-			'variable' => $variables,
+			'simple'         => $simples,
+			'variable'       => $variables,
+			'skipped_groups' => $skipped_groups,
+			'validation'     => $validation,
 		);
 	}
 
@@ -155,7 +170,73 @@ class WTI_Parser {
 			'variable_products' => count( $plan['variable'] ),
 			'variations'        => $variation_count,
 			'total_products'    => count( $plan['simple'] ) + count( $plan['variable'] ),
+			'invalid_offers'    => isset( $plan['validation']['invalid_count'] ) ? $plan['validation']['invalid_count'] : 0,
+			'skipped_groups'    => isset( $plan['skipped_groups'] ) ? count( $plan['skipped_groups'] ) : 0,
 		);
+	}
+
+	public static function validate_offers( $offers ) {
+		$valid   = array();
+		$invalid = array();
+		$reasons = array();
+
+		foreach ( $offers as $offer ) {
+			$offer_reasons = self::validate_offer( $offer );
+
+			if ( empty( $offer_reasons ) ) {
+				$valid[] = $offer;
+				continue;
+			}
+
+			foreach ( $offer_reasons as $reason ) {
+				$reasons[ $reason ] = isset( $reasons[ $reason ] ) ? $reasons[ $reason ] + 1 : 1;
+			}
+
+			$invalid[] = array(
+				'id'        => isset( $offer['id'] ) ? $offer['id'] : '',
+				'group_id'  => isset( $offer['group_id'] ) ? $offer['group_id'] : '',
+				'name'      => isset( $offer['name'] ) ? $offer['name'] : '',
+				'url'       => isset( $offer['url'] ) ? $offer['url'] : '',
+				'reasons'   => $offer_reasons,
+			);
+		}
+
+		return array(
+			'valid'         => $valid,
+			'invalid'       => $invalid,
+			'invalid_count' => count( $invalid ),
+			'reasons'       => $reasons,
+		);
+	}
+
+	public static function validate_offer( $offer ) {
+		$reasons = array();
+
+		foreach ( array( 'id', 'url', 'name', 'category_id' ) as $field ) {
+			if ( empty( $offer[ $field ] ) ) {
+				$reasons[] = 'missing_' . $field;
+			}
+		}
+
+		if ( empty( $offer['is_group_row'] ) ) {
+			if ( empty( $offer['sku'] ) ) {
+				$reasons[] = 'missing_sku';
+			}
+
+			if ( ! isset( $offer['price'] ) || $offer['price'] <= 0 ) {
+				$reasons[] = 'missing_or_zero_price';
+			}
+		}
+
+		if ( ! empty( $offer['group_id'] ) && empty( $offer['is_group_row'] ) && empty( $offer['size'] ) ) {
+			$reasons[] = 'missing_variation_size';
+		}
+
+		if ( empty( $offer['pictures'] ) ) {
+			$reasons[] = 'missing_picture';
+		}
+
+		return array_values( array_unique( $reasons ) );
 	}
 
 	private static function parse_offer_node( XMLReader $reader ) {
