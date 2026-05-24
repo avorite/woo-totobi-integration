@@ -172,9 +172,18 @@
 		$('#wti-resume-import').hide();
 	}
 
+	function updateCategoryModeControls() {
+		var isManual = $('input[name="category_mode"]:checked').val() === 'manual';
+		$('.wti-manual-category-controls').toggleClass('is-disabled', !isManual);
+		$('.wti-manual-category-controls').find('input, select').prop('disabled', !isManual);
+		$('.wti-auto-category-note').toggle(!isManual);
+	}
+
 	$(function () {
 		$('#wti-start-import').on('click', startImport);
 		$('#wti-pause-import').on('click', pauseImport);
 		$('#wti-resume-import').on('click', resumeImport);
+		$('input[name="category_mode"]').on('change', updateCategoryModeControls);
+		updateCategoryModeControls();
 	});
 })(jQuery);

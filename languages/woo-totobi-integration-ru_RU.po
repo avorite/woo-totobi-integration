@@ -34,8 +34,14 @@ msgstr "Ручное сопоставление"
 msgid "Totobi categories"
 msgstr "Категории Totobi"
 
+msgid "Automatic mode uses the approved client category list. Switch to manual mapping to edit this list."
+msgstr "Автоматический режим использует утвержденный список категорий клиента. Переключитесь на ручное сопоставление, чтобы редактировать этот список."
+
 msgid "WooCommerce category mapping"
 msgstr "Сопоставление категорий WooCommerce"
+
+msgid "Automatic mode keeps WooCommerce mapping locked. Switch to manual mapping to edit assignments."
+msgstr "В автоматическом режиме сопоставление WooCommerce заблокировано. Переключитесь на ручное сопоставление, чтобы редактировать назначения."
 
 msgid "Markup percent"
 msgstr "Процент наценки"

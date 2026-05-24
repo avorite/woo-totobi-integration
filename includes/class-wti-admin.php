@@ -132,11 +132,12 @@ class WTI_Admin {
 	private static function save_settings() {
 		$raw_paths = isset( $_POST['selected_paths'] ) ? (array) wp_unslash( $_POST['selected_paths'] ) : array();
 		$paths     = array_values( array_intersect( array_map( 'sanitize_text_field', $raw_paths ), self::get_default_totobi_paths() ) );
+		$category_mode = isset( $_POST['category_mode'] ) && 'manual' === $_POST['category_mode'] ? 'manual' : 'auto';
 
 		$settings = array(
 			'feed_url'       => isset( $_POST['feed_url'] ) ? esc_url_raw( wp_unslash( $_POST['feed_url'] ) ) : WTI_Feed_Client::DEFAULT_PROM_FEED_URL,
 			'main_feed_url'  => isset( $_POST['main_feed_url'] ) ? esc_url_raw( wp_unslash( $_POST['main_feed_url'] ) ) : WTI_Feed_Client::DEFAULT_MAIN_FEED_URL,
-			'category_mode'  => isset( $_POST['category_mode'] ) && 'manual' === $_POST['category_mode'] ? 'manual' : 'auto',
+			'category_mode'  => $category_mode,
 			'markup_percent' => isset( $_POST['markup_percent'] ) ? sanitize_text_field( wp_unslash( $_POST['markup_percent'] ) ) : '0',
 			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '17:00',
 			'sync_interval'  => isset( $_POST['sync_interval'] ) && in_array( $_POST['sync_interval'], array( WTI_Scheduler::SCHEDULE_FOUR_HOURS, WTI_Scheduler::SCHEDULE_SIX_HOURS, 'daily' ), true ) ? sanitize_key( wp_unslash( $_POST['sync_interval'] ) ) : WTI_Scheduler::SCHEDULE_FOUR_HOURS,
@@ -145,8 +146,8 @@ class WTI_Admin {
 			'variable_limit' => 8,
 			'import_images'  => 'yes',
 			'product_status' => 'publish',
-			'selected_paths' => $paths ? $paths : self::get_default_totobi_paths(),
-			'category_map'   => self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ),
+			'selected_paths' => 'manual' === $category_mode && $paths ? $paths : self::get_default_totobi_paths(),
+			'category_map'   => 'manual' === $category_mode ? self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ) : array(),
 		);
 
 		update_option( WTI_OPTION_KEY, $settings, false );
@@ -211,14 +212,22 @@ class WTI_Admin {
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Totobi categories', WTI_TEXT_DOMAIN ); ?></th>
 						<td>
-							<?php foreach ( self::get_default_totobi_paths() as $path ) : ?>
-								<label class="wti-path"><input type="checkbox" name="selected_paths[]" value="<?php echo esc_attr( $path ); ?>" <?php checked( in_array( $path, (array) $settings['selected_paths'], true ) ); ?>> <code><?php echo esc_html( $path ); ?></code></label>
-							<?php endforeach; ?>
+							<div class="wti-manual-category-controls">
+								<?php foreach ( self::get_default_totobi_paths() as $path ) : ?>
+									<label class="wti-path"><input type="checkbox" name="selected_paths[]" value="<?php echo esc_attr( $path ); ?>" <?php checked( in_array( $path, (array) $settings['selected_paths'], true ) ); ?>> <code><?php echo esc_html( $path ); ?></code></label>
+								<?php endforeach; ?>
+							</div>
+							<p class="description wti-auto-category-note"><?php esc_html_e( 'Automatic mode uses the approved client category list. Switch to manual mapping to edit this list.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><?php esc_html_e( 'WooCommerce category mapping', WTI_TEXT_DOMAIN ); ?></th>
-						<td><?php self::render_category_mapping_table( $settings ); ?></td>
+						<td>
+							<div class="wti-manual-category-controls">
+								<?php self::render_category_mapping_table( $settings ); ?>
+							</div>
+							<p class="description wti-auto-category-note"><?php esc_html_e( 'Automatic mode keeps WooCommerce mapping locked. Switch to manual mapping to edit assignments.', WTI_TEXT_DOMAIN ); ?></p>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="markup_percent"><?php esc_html_e( 'Markup percent', WTI_TEXT_DOMAIN ); ?></label></th>
