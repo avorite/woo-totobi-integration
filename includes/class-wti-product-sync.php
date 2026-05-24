@@ -74,6 +74,7 @@ class WTI_Product_Sync {
 				'dry_run'        => true,
 				'import_limit'   => 10,
 				'variable_limit' => 1,
+				'import_images'  => false,
 				'product_status' => 'draft',
 			)
 		);
@@ -105,6 +106,8 @@ class WTI_Product_Sync {
 			'skipped_simple'     => 0,
 			'skipped_variable'   => 0,
 			'skipped_variation'  => 0,
+			'imported_images'    => 0,
+			'image_errors'       => array(),
 			'errors'             => array(),
 		);
 
@@ -114,7 +117,7 @@ class WTI_Product_Sync {
 				break;
 			}
 
-			$write = self::write_simple_product( $action, $status );
+			$write = self::write_simple_product( $action, $status, ! empty( $args['import_images'] ) );
 
 			if ( is_wp_error( $write ) ) {
 				$result['errors'][] = array(
@@ -132,6 +135,8 @@ class WTI_Product_Sync {
 			} else {
 				$result['updated_simple']++;
 			}
+
+			self::merge_image_result( $result, $write );
 		}
 
 		$variation_actions = self::index_variation_actions_by_group( $actions['variations'] );
@@ -142,7 +147,7 @@ class WTI_Product_Sync {
 				continue;
 			}
 
-			$write = self::write_variable_product( $action, $status );
+			$write = self::write_variable_product( $action, $status, ! empty( $args['import_images'] ) );
 
 			if ( is_wp_error( $write ) ) {
 				$result['errors'][] = array(
@@ -160,6 +165,8 @@ class WTI_Product_Sync {
 			} else {
 				$result['updated_variable']++;
 			}
+
+			self::merge_image_result( $result, $write );
 
 			$group_variations = isset( $variation_actions[ $action['group_id'] ] ) ? $variation_actions[ $action['group_id'] ] : array();
 
@@ -208,7 +215,7 @@ class WTI_Product_Sync {
 		);
 	}
 
-	private static function write_simple_product( $action, $status ) {
+	private static function write_simple_product( $action, $status, $import_images = false ) {
 		try {
 			$product = ! empty( $action['product_id'] ) ? wc_get_product( $action['product_id'] ) : new WC_Product_Simple();
 
@@ -241,17 +248,24 @@ class WTI_Product_Sync {
 			$product->update_meta_data( '_wti_params', wp_json_encode( $action['params'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 			$product->update_meta_data( '_wti_picture_urls', wp_json_encode( $action['pictures'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 
+			$image_result = array();
+
+			if ( $import_images ) {
+				$image_result = WTI_Image_Sync::sync_product_images( $product, $action['pictures'] );
+			}
+
 			$product_id = $product->save();
 
 			return array(
-				'product_id' => $product_id,
+				'product_id'   => $product_id,
+				'image_result' => $image_result,
 			);
 		} catch ( Exception $exception ) {
 			return new WP_Error( 'wti_simple_product_write_failed', $exception->getMessage() );
 		}
 	}
 
-	private static function write_variable_product( $action, $status ) {
+	private static function write_variable_product( $action, $status, $import_images = false ) {
 		try {
 			$product = ! empty( $action['product_id'] ) ? wc_get_product( $action['product_id'] ) : new WC_Product_Variable();
 
@@ -273,10 +287,17 @@ class WTI_Product_Sync {
 				$product->update_meta_data( $key, $value );
 			}
 
+			$image_result = array();
+
+			if ( $import_images ) {
+				$image_result = WTI_Image_Sync::sync_product_images( $product, $action['pictures'] );
+			}
+
 			$product_id = $product->save();
 
 			return array(
-				'product_id' => $product_id,
+				'product_id'   => $product_id,
+				'image_result' => $image_result,
 			);
 		} catch ( Exception $exception ) {
 			return new WP_Error( 'wti_variable_product_write_failed', $exception->getMessage() );
@@ -318,6 +339,24 @@ class WTI_Product_Sync {
 		}
 	}
 
+	private static function merge_image_result( &$result, $write ) {
+		if ( empty( $write['image_result'] ) || ! is_array( $write['image_result'] ) ) {
+			return;
+		}
+
+		if ( ! empty( $write['image_result']['featured_id'] ) ) {
+			$result['imported_images']++;
+		}
+
+		if ( ! empty( $write['image_result']['gallery_ids'] ) ) {
+			$result['imported_images'] += count( $write['image_result']['gallery_ids'] );
+		}
+
+		if ( ! empty( $write['image_result']['errors'] ) ) {
+			$result['image_errors'] = array_merge( $result['image_errors'], $write['image_result']['errors'] );
+		}
+	}
+
 	private static function build_variable_action( $action, $product_id, $variable, $args ) {
 		$parent = $variable['parent'];
 
@@ -332,6 +371,7 @@ class WTI_Product_Sync {
 			'variation_count' => count( $variable['variations'] ),
 			'attributes'      => self::collect_variable_attributes( $variable['variations'] ),
 			'woo_category_ids' => self::resolve_woo_category_ids( $parent, $args ),
+			'pictures'        => $parent['pictures'],
 			'meta'            => self::build_common_meta( $parent, $args ),
 		);
 	}
