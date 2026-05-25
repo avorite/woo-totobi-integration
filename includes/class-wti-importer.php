@@ -20,6 +20,7 @@ class WTI_Importer {
 		$feed_url = ! empty( $settings['feed_url'] ) ? $settings['feed_url'] : WTI_Feed_Client::DEFAULT_PROM_FEED_URL;
 		$started = current_time( 'mysql' );
 		$sync_type = empty( $args['manual'] ) ? 'automatic' : 'manual';
+		$report_file = '';
 
 		if ( ! self::acquire_import_lock() ) {
 			return new WP_Error( 'sync_locked', 'Synchronization is already running.' );
@@ -134,6 +135,14 @@ class WTI_Importer {
 				'category_map' => isset( $settings['category_map'] ) ? $settings['category_map'] : array(),
 			)
 		);
+		$report_file = class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::create() : '';
+		if ( '' !== $report_file ) {
+			$session = get_option( self::IMPORT_SESSION_OPTION, array() );
+			if ( is_array( $session ) ) {
+				$session['report_file'] = $report_file;
+				update_option( self::IMPORT_SESSION_OPTION, $session, false );
+			}
+		}
 		$execution = WTI_Product_Sync::execute_action_plan(
 			$actions,
 			array(
@@ -147,6 +156,9 @@ class WTI_Importer {
 				'product_status' => isset( $settings['product_status'] ) ? $settings['product_status'] : 'draft',
 			)
 		);
+		if ( ! empty( $report_file ) && ! empty( $execution['report_rows'] ) && class_exists( 'WTI_Sync_Report' ) ) {
+			WTI_Sync_Report::append_rows( $report_file, $execution['report_rows'] );
+		}
 
 		if ( $batch_mode && ! is_wp_error( $execution ) ) {
 			$execution['simple_total']          = count( $plan['simple'] );
@@ -175,6 +187,7 @@ class WTI_Importer {
 			'updated'      => 0,
 			'skipped'      => 0,
 			'errors'       => 0,
+			'report_url'   => ! empty( $report_file ) && class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::url_for_file( $report_file ) : '',
 		);
 
 		self::save_last_result( $started, $result );

@@ -172,6 +172,11 @@
 				return;
 			}
 
+			if (!data.can_resume) {
+				resetUi();
+				return;
+			}
+
 			isProcessing = false;
 			isPaused = true;
 			$('#wti-progress-wrap').show();
