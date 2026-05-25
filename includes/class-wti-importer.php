@@ -446,8 +446,8 @@ class WTI_Importer {
 		$import_images  = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
 
 		if ( $import_images ) {
-			$simple_size   = min( $simple_size, 1 );
-			$variable_size = min( $variable_size, 1 );
+			$simple_size   = min( $simple_size, 2 );
+			$variable_size = min( $variable_size, 2 );
 		}
 
 		$simple_total   = count( $plan['simple'] );
