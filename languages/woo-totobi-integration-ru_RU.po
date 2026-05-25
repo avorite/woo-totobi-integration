@@ -94,8 +94,8 @@ msgstr "Пауза"
 msgid "Resume"
 msgstr "Продолжить"
 
-msgid "Reset stuck sync"
-msgstr "Сбросить зависшую синхронизацию"
+msgid "Reset sync"
+msgstr "Сбросить синхронизацию"
 
 msgid "Waiting to start"
 msgstr "Ожидание запуска"
@@ -273,4 +273,7 @@ msgstr "Сбросить текущую сессию синхронизации?
 
 msgid "Sync session reset."
 msgstr "Сессия синхронизации сброшена."
+
+msgid "Sync was interrupted. Continue?"
+msgstr "Синхронизация была прервана. Продолжить?"
 

@@ -24,6 +24,7 @@
 		$('#wti-start-import').prop('disabled', true);
 		$('#wti-pause-import').show();
 		$('#wti-resume-import').hide();
+		$('#wti-reset-import').hide();
 		$('#wti-progress-wrap').show();
 		$('#wti-log-output').text('');
 		updateProgress({ total: 0, processed: 0 });
@@ -108,9 +109,12 @@
 	}
 
 	function resumeImport() {
+		isProcessing = true;
 		isPaused = false;
+		$('#wti-start-import').prop('disabled', true);
 		$('#wti-pause-import').show();
 		$('#wti-resume-import').hide();
+		$('#wti-reset-import').hide();
 		updateStatus(t('resumedStatus', 'Sync resumed. Processing next batch...'));
 		addLog(t('syncResumed', 'Sync resumed.'));
 
@@ -134,6 +138,36 @@
 			updateProgress({ total: 0, processed: 0 });
 			updateStatus(t('resetDone', 'Sync session reset.'));
 			addLog(t('resetDone', 'Sync session reset.'));
+		});
+	}
+
+	function restoreImportSession() {
+		$.post(wtiAdmin.ajaxUrl, {
+			action: 'wti_get_progress',
+			_wpnonce: wtiAdmin.nonce
+		}).done(function (response) {
+			if (!response.success || !response.data || !response.data.status) {
+				resetUi();
+				return;
+			}
+
+			var data = response.data;
+
+			if (data.status !== 'running' && data.status !== 'paused') {
+				resetUi();
+				return;
+			}
+
+			isProcessing = false;
+			isPaused = true;
+			$('#wti-progress-wrap').show();
+			$('#wti-start-import').prop('disabled', true);
+			$('#wti-pause-import').hide();
+			$('#wti-resume-import').show();
+			$('#wti-reset-import').show();
+			updateProgress(data);
+			updateStatus(t('interrupted', 'Sync was interrupted. Continue?'));
+			addLog(t('interrupted', 'Sync was interrupted. Continue?'));
 		});
 	}
 
@@ -187,6 +221,7 @@
 		$('#wti-start-import').prop('disabled', false);
 		$('#wti-pause-import').hide();
 		$('#wti-resume-import').hide();
+		$('#wti-reset-import').hide();
 	}
 
 	function updateCategoryModeControls() {
@@ -203,5 +238,6 @@
 		$('#wti-reset-import').on('click', resetImport);
 		$('input[name="category_mode"]').on('change', updateCategoryModeControls);
 		updateCategoryModeControls();
+		restoreImportSession();
 	});
 })(jQuery);
