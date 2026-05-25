@@ -118,6 +118,9 @@ msgstr "изображений загружено"
 msgid "unchanged skipped"
 msgstr "неизмененных пропущено"
 
+msgid "products unchanged skipped"
+msgstr "товаров без изменений пропущено"
+
 msgid "missing set out of stock"
 msgstr "отсутствующих нет в наличии"
 

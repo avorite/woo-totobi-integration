@@ -309,7 +309,7 @@ class WTI_Admin {
 					<div><span id="wti-stat-updated-variable">0</span><small><?php esc_html_e( 'variable updated', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-updated-variation">0</span><small><?php esc_html_e( 'variations updated', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-images">0</span><small><?php esc_html_e( 'images downloaded', WTI_TEXT_DOMAIN ); ?></small></div>
-					<div><span id="wti-stat-skipped">0</span><small><?php esc_html_e( 'unchanged skipped', WTI_TEXT_DOMAIN ); ?></small></div>
+					<div><span id="wti-stat-skipped">0</span><small><?php esc_html_e( 'products unchanged skipped', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-deleted">0</span><small><?php esc_html_e( 'missing set out of stock', WTI_TEXT_DOMAIN ); ?></small></div>
 					<div><span id="wti-stat-errors">0</span><small><?php esc_html_e( 'errors', WTI_TEXT_DOMAIN ); ?></small></div>
 				</div>
