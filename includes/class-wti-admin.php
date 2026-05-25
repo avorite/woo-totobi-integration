@@ -145,7 +145,7 @@ class WTI_Admin {
 			'feed_url'       => isset( $_POST['feed_url'] ) ? esc_url_raw( wp_unslash( $_POST['feed_url'] ) ) : WTI_Feed_Client::DEFAULT_PROM_FEED_URL,
 			'main_feed_url'  => isset( $_POST['main_feed_url'] ) ? esc_url_raw( wp_unslash( $_POST['main_feed_url'] ) ) : WTI_Feed_Client::DEFAULT_MAIN_FEED_URL,
 			'category_mode'  => $category_mode,
-			'markup_percent' => isset( $_POST['markup_percent'] ) ? sanitize_text_field( wp_unslash( $_POST['markup_percent'] ) ) : '0',
+			'markup_percent' => isset( $_POST['markup_percent'] ) ? (string) max( 0, (float) wc_format_decimal( wp_unslash( $_POST['markup_percent'] ) ) ) : '0',
 			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '17:00',
 			'sync_interval'  => isset( $_POST['sync_interval'] ) && in_array( $_POST['sync_interval'], array( WTI_Scheduler::SCHEDULE_FOUR_HOURS, WTI_Scheduler::SCHEDULE_SIX_HOURS, 'daily' ), true ) ? sanitize_key( wp_unslash( $_POST['sync_interval'] ) ) : WTI_Scheduler::SCHEDULE_FOUR_HOURS,
 			'dry_run'        => 'no',
@@ -239,7 +239,7 @@ class WTI_Admin {
 					</tr>
 					<tr>
 						<th scope="row"><label for="markup_percent"><?php esc_html_e( 'Markup percent', WTI_TEXT_DOMAIN ); ?></label></th>
-						<td><input type="number" step="0.01" id="markup_percent" name="markup_percent" value="<?php echo esc_attr( $settings['markup_percent'] ); ?>"></td>
+						<td><input type="number" min="0" step="0.01" id="markup_percent" name="markup_percent" value="<?php echo esc_attr( $settings['markup_percent'] ); ?>"></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="sync_time"><?php esc_html_e( 'First sync time', WTI_TEXT_DOMAIN ); ?></label></th>

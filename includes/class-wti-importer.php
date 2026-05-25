@@ -161,6 +161,7 @@ class WTI_Importer {
 				'dry_run'      => 'yes' === $settings['dry_run'],
 				'catalog_date' => $catalog_date,
 				'category_map' => isset( $settings['category_map'] ) ? $settings['category_map'] : array(),
+				'markup_percent' => isset( $settings['markup_percent'] ) ? $settings['markup_percent'] : 0,
 			)
 		);
 		$report_file = class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::create() : '';
@@ -550,6 +551,7 @@ class WTI_Importer {
 				'dry_run'      => ! empty( $session['dry_run'] ),
 				'catalog_date' => $session['catalog_date'],
 				'category_map' => isset( $settings['category_map'] ) ? $settings['category_map'] : array(),
+				'markup_percent' => isset( $settings['markup_percent'] ) ? $settings['markup_percent'] : 0,
 			)
 		) : array();
 

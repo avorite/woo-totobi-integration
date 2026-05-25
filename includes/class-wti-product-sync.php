@@ -19,6 +19,7 @@ class WTI_Product_Sync {
 				'dry_run'      => true,
 				'catalog_date' => '',
 				'category_map' => array(),
+				'markup_percent' => 0,
 			)
 		);
 
@@ -392,7 +393,7 @@ class WTI_Product_Sync {
 			'sku'         => $offer['sku'],
 			'name'        => $offer['name'],
 			'category_id' => $offer['category_id'],
-			'price'       => $offer['price'],
+			'price'       => self::apply_markup( $offer['price'], $args ),
 			'stock'       => $offer['quantity_in_stock'],
 			'stock_status' => $offer['stock_status'],
 			'woo_category_ids' => self::resolve_woo_category_ids( $offer, $args ),
@@ -593,7 +594,7 @@ class WTI_Product_Sync {
 			'name'         => $parent_offer['name'],
 			'size'         => $variation['size'],
 			'color'        => $variation['color'],
-			'price'        => $variation['price'],
+			'price'        => self::apply_markup( $variation['price'], $args ),
 			'stock'        => $variation['quantity_in_stock'],
 			'stock_status' => $variation['stock_status'],
 			'meta'         => self::build_common_meta( $variation, $args ),
@@ -613,6 +614,17 @@ class WTI_Product_Sync {
 		);
 	}
 
+	private static function apply_markup( $price, $args ) {
+		$price   = (float) $price;
+		$percent = isset( $args['markup_percent'] ) ? max( 0, (float) $args['markup_percent'] ) : 0;
+
+		if ( $price <= 0 || $percent <= 0 ) {
+			return $price;
+		}
+
+		return round( $price * ( 1 + ( $percent / 100 ) ), wc_get_price_decimals() );
+	}
+
 	private static function is_offer_unchanged( $product_id, $offer, $args ) {
 		if ( ! $product_id || empty( $offer['raw_hash'] ) ) {
 			return false;
@@ -621,6 +633,13 @@ class WTI_Product_Sync {
 		$current_hash = (string) get_post_meta( $product_id, self::META_RAW_HASH, true );
 
 		if ( $current_hash !== (string) $offer['raw_hash'] ) {
+			return false;
+		}
+
+		$expected_price = self::apply_markup( isset( $offer['price'] ) ? $offer['price'] : 0, $args );
+		$product        = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : false;
+
+		if ( $product && (float) wc_format_decimal( $product->get_regular_price() ) !== (float) wc_format_decimal( $expected_price ) ) {
 			return false;
 		}
 
