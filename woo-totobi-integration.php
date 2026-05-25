@@ -22,6 +22,7 @@ define( 'WTI_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WTI_TEXT_DOMAIN', 'woo-totobi-integration' );
 define( 'WTI_OPTION_KEY', 'wti_settings' );
 define( 'WTI_CRON_HOOK', 'wti_scheduled_sync' );
+define( 'WTI_CRON_CONTINUE_HOOK', 'wti_scheduled_sync_continue' );
 
 $wti_includes = array(
 	'includes/class-wti-logger.php',
@@ -59,3 +60,4 @@ add_action( 'wp_ajax_wti_pause_import', array( 'WTI_Importer', 'handle_ajax_paus
 add_action( 'wp_ajax_wti_resume_import', array( 'WTI_Importer', 'handle_ajax_resume' ) );
 add_action( 'wp_ajax_wti_reset_import', array( 'WTI_Importer', 'handle_ajax_reset' ) );
 add_action( WTI_CRON_HOOK, array( 'WTI_Importer', 'run_scheduled_sync' ) );
+add_action( WTI_CRON_CONTINUE_HOOK, array( 'WTI_Importer', 'run_scheduled_batch' ) );

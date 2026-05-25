@@ -34,6 +34,12 @@ class WTI_Scheduler {
 		if ( $timestamp ) {
 			wp_unschedule_event( $timestamp, WTI_CRON_HOOK );
 		}
+
+		$continue_timestamp = defined( 'WTI_CRON_CONTINUE_HOOK' ) ? wp_next_scheduled( WTI_CRON_CONTINUE_HOOK ) : false;
+
+		if ( $continue_timestamp ) {
+			wp_unschedule_event( $continue_timestamp, WTI_CRON_CONTINUE_HOOK );
+		}
 	}
 
 	public static function reschedule() {

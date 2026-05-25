@@ -153,6 +153,20 @@
 
 			var data = response.data;
 
+			if (data.status === 'preparing') {
+				isProcessing = false;
+				isPaused = true;
+				$('#wti-progress-wrap').show();
+				$('#wti-start-import').prop('disabled', true);
+				$('#wti-pause-import').hide();
+				$('#wti-resume-import').hide();
+				$('#wti-reset-import').show();
+				updateProgress(data);
+				updateStatus(t('preparing', 'Preparing Totobi feed...'));
+				addLog(t('preparing', 'Preparing Totobi feed...'));
+				return;
+			}
+
 			if (data.status !== 'running' && data.status !== 'paused') {
 				resetUi();
 				return;
