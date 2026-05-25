@@ -165,6 +165,19 @@ class WTI_Image_Sync {
 			);
 		}
 
+		$expected_file_name = '' !== $expected_name ? sanitize_file_name( $expected_name ) : sanitize_file_name( wp_basename( parse_url( $url, PHP_URL_PATH ) ) );
+		$existing_id        = self::find_attachment_by_file_name( $expected_file_name );
+
+		if ( $existing_id ) {
+			update_post_meta( $existing_id, self::META_SOURCE_URL, $url );
+			update_post_meta( $existing_id, self::META_SOURCE_HASH, md5( $url ) );
+
+			return array(
+				'id'     => $existing_id,
+				'status' => 'reused',
+			);
+		}
+
 		$tmp = download_url( $url, 60 );
 
 		if ( is_wp_error( $tmp ) ) {
@@ -319,6 +332,36 @@ class WTI_Image_Sync {
 		);
 
 		return empty( $query->posts ) ? 0 : (int) $query->posts[0];
+	}
+
+	private static function find_attachment_by_file_name( $file_name ) {
+		$file_name = sanitize_file_name( (string) $file_name );
+
+		if ( '' === $file_name ) {
+			return 0;
+		}
+
+		$query = new WP_Query(
+			array(
+				'fields'         => 'ids',
+				'post_type'      => 'attachment',
+				'post_status'    => 'inherit',
+				'posts_per_page' => 20,
+				'no_found_rows'  => true,
+				's'              => pathinfo( $file_name, PATHINFO_FILENAME ),
+			)
+		);
+
+		foreach ( $query->posts as $attachment_id ) {
+			$file = get_attached_file( $attachment_id );
+			$name = $file ? sanitize_file_name( wp_basename( $file ) ) : sanitize_file_name( wp_basename( get_the_title( $attachment_id ) ) );
+
+			if ( $name === $file_name ) {
+				return (int) $attachment_id;
+			}
+		}
+
+		return 0;
 	}
 
 	private static function load_media_functions() {

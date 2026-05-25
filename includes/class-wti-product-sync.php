@@ -173,6 +173,7 @@ class WTI_Product_Sync {
 			'imported_images'    => 0,
 			'reused_images'      => 0,
 			'skipped_images'     => 0,
+			'report_rows'        => array(),
 			'image_errors'       => array(),
 			'errors'             => array(),
 		);
@@ -204,6 +205,7 @@ class WTI_Product_Sync {
 			}
 
 			self::merge_image_result( $result, $write );
+			$result['report_rows'][] = self::build_report_row( 'simple', $action['action'], $action, $write['product_id'], '' );
 		}
 
 		$variation_actions = self::index_variation_actions_by_group( $actions['variations'] );
@@ -237,6 +239,7 @@ class WTI_Product_Sync {
 			self::merge_image_result( $result, $write );
 
 			$group_variations = isset( $variation_actions[ $action['group_id'] ] ) ? $variation_actions[ $action['group_id'] ] : array();
+			$variation_details = array();
 
 			foreach ( $group_variations as $variation_action ) {
 				if ( 'skip_unchanged_variation' === $variation_action['action'] ) {
@@ -261,7 +264,11 @@ class WTI_Product_Sync {
 				} else {
 					$result['updated_variation']++;
 				}
+
+				$variation_details[] = trim( sprintf( '%s %s %s', $variation_action['sku'], $variation_action['size'], $variation_action['action'] ) );
 			}
+
+			$result['report_rows'][] = self::build_report_row( 'variable', $action['action'], $action, $write['product_id'], implode( '; ', array_filter( $variation_details ) ) );
 		}
 
 		foreach ( $deleted_batch as $action ) {
@@ -278,6 +285,7 @@ class WTI_Product_Sync {
 
 			$result['processed']++;
 			$result['deleted_outofstock']++;
+			$result['report_rows'][] = self::build_report_row( 'missing', 'outofstock', $action, $action['product_id'], 'Missing from latest Totobi feed; set out of stock.' );
 		}
 
 		$result['skipped_simple']    = max( 0, $simple_total - $result['next_simple_offset'] );
@@ -285,6 +293,19 @@ class WTI_Product_Sync {
 		$result['skipped_variation'] = max( 0, count( $actions['variations'] ) - $result['created_variation'] - $result['updated_variation'] );
 
 		return $result;
+	}
+
+	private static function build_report_row( $type, $action, $action_data, $product_id, $details ) {
+		$product = $product_id ? wc_get_product( $product_id ) : false;
+
+		return array(
+			'type'    => $type,
+			'action'  => $action,
+			'name'    => isset( $action_data['name'] ) ? $action_data['name'] : ( $product ? $product->get_name() : '' ),
+			'sku'     => isset( $action_data['sku'] ) ? $action_data['sku'] : ( $product ? $product->get_sku() : '' ),
+			'url'     => $product_id ? get_permalink( $product_id ) : '',
+			'details' => $details,
+		);
 	}
 
 	private static function build_simple_action( $action, $product_id, $offer, $args ) {

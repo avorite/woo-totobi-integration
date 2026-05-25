@@ -342,6 +342,9 @@ class WTI_Admin {
 		<?php if ( ! empty( $last_result['message'] ) ) : ?>
 			<p class="wti-result-message"><?php echo esc_html( self::clean_log_message( $last_result['message'] ) ); ?></p>
 		<?php endif; ?>
+		<?php if ( ! empty( $last_result['report_url'] ) ) : ?>
+			<p class="wti-result-message"><a class="button" href="<?php echo esc_url( $last_result['report_url'] ); ?>"><?php esc_html_e( 'Download updated products CSV', WTI_TEXT_DOMAIN ); ?></a></p>
+		<?php endif; ?>
 		<?php
 	}
 

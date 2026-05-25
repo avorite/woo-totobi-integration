@@ -233,6 +233,7 @@ class WTI_Importer {
 			'deleted_outofstock'  => 0,
 			'errors'              => 0,
 			'error_samples'       => array(),
+			'report_file'         => class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::create() : '',
 			'plan'                => $summary,
 			'validation'          => self::build_validation_summary( $plan ),
 		);
@@ -267,8 +268,8 @@ class WTI_Importer {
 		$import_images  = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
 
 		if ( $import_images ) {
-			$simple_size   = min( $simple_size, 1 );
-			$variable_size = min( $variable_size, 1 );
+			$simple_size   = min( $simple_size, 3 );
+			$variable_size = min( $variable_size, 3 );
 		}
 
 		$simple_total   = count( $plan['simple'] );
@@ -325,6 +326,9 @@ class WTI_Importer {
 		}
 
 		self::merge_execution_into_session( $session, $execution );
+		if ( ! empty( $session['report_file'] ) && ! empty( $execution['report_rows'] ) && class_exists( 'WTI_Sync_Report' ) ) {
+			WTI_Sync_Report::append_rows( $session['report_file'], $execution['report_rows'] );
+		}
 		$session['processed'] = min( $session['total'], (int) $session['simple_offset'] + (int) $session['variable_offset'] + (int) $session['deleted_offset'] );
 		$session['status']    = 'running';
 
@@ -427,6 +431,7 @@ class WTI_Importer {
 			'updated'      => (int) $session['updated_simple'] + (int) $session['updated_variable'] + (int) $session['updated_variation'],
 			'skipped'      => 0,
 			'errors'       => (int) $session['errors'],
+			'report_url'   => ! empty( $session['report_file'] ) && class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::url_for_file( $session['report_file'] ) : '',
 		);
 
 		self::save_last_result( isset( $session['started_at'] ) ? $session['started_at'] : current_time( 'mysql' ), $result );
@@ -471,6 +476,7 @@ class WTI_Importer {
 			'errors'             => isset( $session['errors'] ) ? (int) $session['errors'] : 0,
 			'error_samples'      => isset( $session['error_samples'] ) ? $session['error_samples'] : array(),
 			'catalog_date'       => isset( $session['catalog_date'] ) ? $session['catalog_date'] : '',
+			'report_url'         => ! empty( $session['report_file'] ) && class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::url_for_file( $session['report_file'] ) : '',
 			'dry_run'            => ! empty( $session['dry_run'] ),
 		);
 	}

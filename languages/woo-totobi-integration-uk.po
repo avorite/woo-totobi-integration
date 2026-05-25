@@ -160,6 +160,9 @@ msgstr "Немає в наявності"
 msgid "Images"
 msgstr "Зображення"
 
+msgid "Download updated products CSV"
+msgstr "Завантажити CSV оновлених товарів"
+
 msgid "Errors"
 msgstr "Помилки"
 
