@@ -23,7 +23,7 @@ class WTI_Importer {
 	}
 
 	public static function run_scheduled_batch() {
-		return self::process_stored_batch( 1, 1, false );
+		return self::process_stored_batch( 2, 2, false );
 	}
 
 	public static function run_sync( $args = array() ) {
@@ -313,7 +313,7 @@ class WTI_Importer {
 
 		WTI_Logger::log( 'Scheduled AJAX-style import started.', array( 'total' => $total, 'catalog_date' => $catalog_date ) );
 
-		return self::process_stored_batch( 1, 1, false );
+		return self::process_stored_batch( 2, 2, false );
 	}
 
 	public static function handle_ajax_start() {
@@ -563,6 +563,7 @@ class WTI_Importer {
 		self::check_ajax_request();
 		delete_transient( self::IMPORT_PLAN_TRANSIENT );
 		delete_option( self::IMPORT_SESSION_OPTION );
+		self::unschedule_automatic_continue();
 		self::release_import_lock();
 		wp_send_json_success( array( 'reset' => true ) );
 	}
@@ -651,6 +652,18 @@ class WTI_Importer {
 
 		if ( ! wp_next_scheduled( WTI_CRON_CONTINUE_HOOK ) ) {
 			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, WTI_CRON_CONTINUE_HOOK );
+		}
+	}
+
+	private static function unschedule_automatic_continue() {
+		if ( ! defined( 'WTI_CRON_CONTINUE_HOOK' ) ) {
+			return;
+		}
+
+		$timestamp = wp_next_scheduled( WTI_CRON_CONTINUE_HOOK );
+
+		if ( $timestamp ) {
+			wp_unschedule_event( $timestamp, WTI_CRON_CONTINUE_HOOK );
 		}
 	}
 
