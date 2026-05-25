@@ -3,6 +3,7 @@
 
 	var isProcessing = false;
 	var isPaused = false;
+	var autoPollTimer = null;
 	var retryCount = 0;
 	var strings = wtiAdmin.strings || {};
 
@@ -183,6 +184,7 @@
 				updateProgress(data);
 				updateStatus(t('automaticRunning', 'Automatic sync is running.'));
 				addLog(t('automaticRunning', 'Automatic sync is running.'));
+				startAutomaticPolling();
 				return;
 			}
 
@@ -201,6 +203,39 @@
 			updateProgress(data);
 			updateStatus(t('interrupted', 'Sync was interrupted. Continue?'));
 			addLog(t('interrupted', 'Sync was interrupted. Continue?'));
+		});
+	}
+
+	function startAutomaticPolling() {
+		if (autoPollTimer) {
+			window.clearTimeout(autoPollTimer);
+		}
+
+		autoPollTimer = window.setTimeout(pollAutomaticProgress, 4000);
+	}
+
+	function pollAutomaticProgress() {
+		$.post(wtiAdmin.ajaxUrl, {
+			action: 'wti_run_automatic_batch',
+			_wpnonce: wtiAdmin.nonce
+		}).done(function (response) {
+			if (!response.success || !response.data || response.data.sync_type !== 'automatic' || (response.data.status !== 'running' && response.data.status !== 'paused')) {
+				autoPollTimer = null;
+				if (response.success && response.data) {
+					updateProgress(response.data);
+					if (response.data.status === 'completed') {
+						updateStatus(t('syncCompleted', 'Sync completed.'));
+					}
+				}
+				resetUi();
+				return;
+			}
+
+			updateProgress(response.data);
+			updateStatus(t('automaticRunning', 'Automatic sync is running.'));
+			startAutomaticPolling();
+		}).fail(function () {
+			startAutomaticPolling();
 		});
 	}
 
@@ -251,6 +286,10 @@
 	function resetUi() {
 		isProcessing = false;
 		isPaused = false;
+		if (autoPollTimer) {
+			window.clearTimeout(autoPollTimer);
+			autoPollTimer = null;
+		}
 		$('#wti-start-import').prop('disabled', false);
 		$('#wti-pause-import').hide();
 		$('#wti-resume-import').hide();

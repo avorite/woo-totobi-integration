@@ -24,7 +24,18 @@ class WTI_Importer {
 	}
 
 	public static function run_scheduled_batch() {
-		return self::process_stored_batch( 2, 2, false );
+		$result   = null;
+		$deadline = time() + 20;
+
+		do {
+			$result = self::process_stored_batch( 2, 2, false );
+
+			if ( is_wp_error( $result ) || ! empty( $result['completed'] ) ) {
+				return $result;
+			}
+		} while ( time() < $deadline );
+
+		return $result;
 	}
 
 	public static function run_sync( $args = array() ) {
@@ -110,9 +121,10 @@ class WTI_Importer {
 
 		$plan            = WTI_Parser::build_import_plan( $offers );
 		$import_images   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
+		$full_plan       = $plan;
 		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, false );
 		$plan            = $index_result['plan'];
-		$media_plan      = $import_images ? self::build_media_plan( $plan ) : array();
+		$media_plan      = $import_images ? self::build_media_plan( $full_plan ) : array();
 		$summary         = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];
@@ -209,6 +221,7 @@ class WTI_Importer {
 		self::save_last_result( $started, $result );
 		self::save_last_catalog_date( $catalog_date );
 		WTI_Feed_Index::save_from_store( $catalog_date );
+		self::flush_site_caches();
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
 		self::finish_sync_session( 'completed', $sync_type, $started, $result['message'], $catalog_date, $execution );
 		self::release_import_lock();
@@ -285,17 +298,18 @@ class WTI_Importer {
 
 		$plan         = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
+		$full_plan    = $plan;
 		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false );
 		$plan         = $index_result['plan'];
-		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
+		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $full_plan ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];
 		$summary['feed_total_products'] = (int) $full_summary['total_products'];
 		$total = (int) $summary['simple_products'] + (int) $summary['variable_products'] + (int) $summary['deleted_products'] + count( $media_plan );
 
-		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 2 * HOUR_IN_SECONDS );
-		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 2 * HOUR_IN_SECONDS );
+		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 12 * HOUR_IN_SECONDS );
+		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 12 * HOUR_IN_SECONDS );
 
 		self::save_sync_session(
 			array(
@@ -370,9 +384,10 @@ class WTI_Importer {
 
 		$plan    = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
+		$full_plan    = $plan;
 		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false );
 		$plan         = $index_result['plan'];
-		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
+		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $full_plan ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']   = (int) $index_result['unchanged'];
 		$summary['deleted_products']     = (int) $index_result['deleted'];
@@ -384,8 +399,8 @@ class WTI_Importer {
 			self::fail_ajax_start( 'No products found for selected Totobi categories.' );
 		}
 
-		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 2 * HOUR_IN_SECONDS );
-		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 2 * HOUR_IN_SECONDS );
+		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 12 * HOUR_IN_SECONDS );
+		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 12 * HOUR_IN_SECONDS );
 
 		$session = array(
 			'status'              => 'running',
@@ -436,12 +451,37 @@ class WTI_Importer {
 		self::process_stored_batch( null, null, true );
 	}
 
+	public static function handle_ajax_automatic_batch() {
+		self::check_ajax_request();
+
+		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
+
+		if ( ! is_array( $session ) || 'automatic' !== ( $session['sync_type'] ?? '' ) || 'running' !== ( $session['status'] ?? '' ) ) {
+			wp_send_json_success( self::session_response( $session ) );
+		}
+
+		$result = self::process_stored_batch( 2, 2, false );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( $result->get_error_message() );
+		}
+
+		wp_send_json_success( $result );
+	}
+
 	private static function process_stored_batch( $simple_size = null, $variable_size = null, $send_json = true ) {
 		self::refresh_import_lock();
 
 		$plan       = get_transient( self::IMPORT_PLAN_TRANSIENT );
 		$media_plan = get_transient( self::MEDIA_PLAN_TRANSIENT );
 		if ( ! is_array( $plan ) ) {
+			$session = get_option( self::IMPORT_SESSION_OPTION, array() );
+			if ( is_array( $session ) ) {
+				$session['status']      = 'error';
+				$session['message']     = 'Import session expired. Start import again.';
+				$session['finished_at'] = current_time( 'mysql' );
+				update_option( self::IMPORT_SESSION_OPTION, $session, false );
+			}
 			self::release_import_lock();
 			return self::batch_error( 'Import session expired. Start import again.', $send_json );
 		}
@@ -655,6 +695,7 @@ class WTI_Importer {
 		self::save_last_result( isset( $session['started_at'] ) ? $session['started_at'] : current_time( 'mysql' ), $result );
 		self::save_last_catalog_date( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
 		WTI_Feed_Index::save_from_store( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
+		self::flush_site_caches();
 		WTI_Logger::log( 'AJAX import completed.', $result );
 
 		$response                = self::session_response( $session );
@@ -696,6 +737,46 @@ class WTI_Importer {
 		if ( $timestamp ) {
 			wp_unschedule_event( $timestamp, WTI_CRON_CONTINUE_HOOK );
 		}
+	}
+
+	private static function flush_site_caches() {
+		if ( function_exists( 'wp_cache_flush' ) ) {
+			wp_cache_flush();
+		}
+
+		if ( function_exists( 'w3tc_flush_all' ) ) {
+			w3tc_flush_all();
+		}
+
+		if ( class_exists( 'W3TC\\Dispatcher' ) ) {
+			try {
+				$plugin = \W3TC\Dispatcher::component( 'CacheFlush' );
+				if ( $plugin && method_exists( $plugin, 'flush_all' ) ) {
+					$plugin->flush_all();
+				}
+			} catch ( Exception $exception ) {
+				// Cache plugins should never break a completed import.
+			}
+		}
+
+		if ( class_exists( 'LiteSpeed_Cache_API' ) && method_exists( 'LiteSpeed_Cache_API', 'purge_all' ) ) {
+			LiteSpeed_Cache_API::purge_all();
+		}
+
+		if ( function_exists( 'rocket_clean_domain' ) ) {
+			rocket_clean_domain();
+		}
+
+		if ( class_exists( 'autoptimizeCache' ) && method_exists( 'autoptimizeCache', 'clearall' ) ) {
+			autoptimizeCache::clearall();
+		}
+
+		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
+			sg_cachepress_purge_cache();
+		}
+
+		do_action( 'wti_after_cache_flush' );
+		WTI_Logger::log( 'Site caches flushed after Totobi sync.' );
 	}
 
 	private static function session_response( $session ) {
@@ -812,9 +893,11 @@ class WTI_Importer {
 
 	private static function build_media_plan( $plan ) {
 		$media_plan = array();
+		$previous   = get_option( WTI_Feed_Index::OPTION_KEY, array() );
+		$rows       = isset( $previous['offers'] ) && is_array( $previous['offers'] ) ? $previous['offers'] : array();
 
 		foreach ( isset( $plan['simple'] ) ? $plan['simple'] : array() as $offer ) {
-			if ( ! empty( $offer['pictures'] ) ) {
+			if ( self::offer_needs_media_job( $offer, $rows ) ) {
 				$media_plan[] = self::media_offer_row( $offer, 'simple' );
 			}
 		}
@@ -822,12 +905,29 @@ class WTI_Importer {
 		foreach ( isset( $plan['variable'] ) ? $plan['variable'] : array() as $variable ) {
 			$parent = isset( $variable['parent'] ) ? $variable['parent'] : array();
 
-			if ( ! empty( $parent['pictures'] ) ) {
+			if ( self::offer_needs_media_job( $parent, $rows ) ) {
 				$media_plan[] = self::media_offer_row( $parent, 'variable' );
 			}
 		}
 
 		return $media_plan;
+	}
+
+	private static function offer_needs_media_job( $offer, $previous_rows ) {
+		if ( empty( $offer['pictures'] ) || ! class_exists( 'WTI_Image_Sync' ) ) {
+			return false;
+		}
+
+		$offer_id = isset( $offer['id'] ) ? (string) $offer['id'] : '';
+
+		if ( '' === $offer_id || empty( $previous_rows[ $offer_id ] ) ) {
+			return true;
+		}
+
+		$expected_hash = WTI_Image_Sync::build_image_set_hash_from_urls( $offer['pictures'] );
+		$current_hash  = isset( $previous_rows[ $offer_id ]['image_hash'] ) ? (string) $previous_rows[ $offer_id ]['image_hash'] : '';
+
+		return '' === $current_hash || $current_hash !== $expected_hash;
 	}
 
 	private static function media_offer_row( $offer, $type ) {
