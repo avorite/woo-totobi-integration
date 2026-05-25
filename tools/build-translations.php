@@ -104,6 +104,7 @@ $translations = array(
 		'Reset the current sync session?' => 'Сбросить текущую сессию синхронизации?',
 		'Sync session reset.' => 'Сессия синхронизации сброшена.',
 		'Sync was interrupted. Continue?' => 'Синхронизация была прервана. Продолжить?',
+		'Automatic sync is running.' => 'Идет автоматическая синхронизация.',
 	),
 	'uk' => array(
 		'Totobi Integration' => 'Інтеграція Totobi',
@@ -204,6 +205,7 @@ $translations = array(
 		'Reset the current sync session?' => 'Скинути поточну сесію синхронізації?',
 		'Sync session reset.' => 'Сесію синхронізації скинуто.',
 		'Sync was interrupted. Continue?' => 'Синхронізацію було перервано. Продовжити?',
+		'Automatic sync is running.' => 'Йде автоматична синхронізація.',
 	),
 );
 

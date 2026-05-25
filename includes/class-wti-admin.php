@@ -106,6 +106,7 @@ class WTI_Admin {
 					'resetConfirm'    => __( 'Reset the current sync session?', WTI_TEXT_DOMAIN ),
 					'resetDone'       => __( 'Sync session reset.', WTI_TEXT_DOMAIN ),
 					'interrupted'     => __( 'Sync was interrupted. Continue?', WTI_TEXT_DOMAIN ),
+					'automaticRunning'=> __( 'Automatic sync is running.', WTI_TEXT_DOMAIN ),
 				),
 			)
 		);

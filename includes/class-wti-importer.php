@@ -19,10 +19,23 @@ class WTI_Importer {
 		$settings = WTI_Admin::get_settings();
 		$feed_url = ! empty( $settings['feed_url'] ) ? $settings['feed_url'] : WTI_Feed_Client::DEFAULT_PROM_FEED_URL;
 		$started = current_time( 'mysql' );
+		$sync_type = empty( $args['manual'] ) ? 'automatic' : 'manual';
 
 		if ( ! self::acquire_import_lock() ) {
 			return new WP_Error( 'sync_locked', 'Synchronization is already running.' );
 		}
+
+		self::save_sync_session(
+			array(
+				'status'      => 'running',
+				'sync_type'   => $sync_type,
+				'started_at'  => $started,
+				'start_time'  => microtime( true ),
+				'total'       => 0,
+				'processed'   => 0,
+				'settings'    => $settings,
+			)
+		);
 
 		WTI_Logger::log( 'Sync scaffold started.', array( 'manual' => ! empty( $args['manual'] ), 'feed_url' => $feed_url ) );
 
@@ -31,6 +44,7 @@ class WTI_Importer {
 		if ( is_wp_error( $xml ) ) {
 			WTI_Logger::log( 'Feed fetch failed.', array( 'error' => $xml->get_error_message() ) );
 			self::save_last_result( $started, array( 'status' => 'error', 'message' => $xml->get_error_message() ) );
+			self::finish_sync_session( 'error', $sync_type, $started, $xml->get_error_message() );
 			self::release_import_lock();
 
 			return $xml;
@@ -41,6 +55,7 @@ class WTI_Importer {
 		if ( is_wp_error( $meta ) ) {
 			WTI_Logger::log( 'Feed parse failed.', array( 'error' => $meta->get_error_message() ) );
 			self::save_last_result( $started, array( 'status' => 'error', 'message' => $meta->get_error_message() ) );
+			self::finish_sync_session( 'error', $sync_type, $started, $meta->get_error_message() );
 			self::release_import_lock();
 
 			return $meta;
@@ -58,6 +73,7 @@ class WTI_Importer {
 
 			self::save_last_result( $started, $result );
 			WTI_Logger::log( 'Scheduled sync skipped because catalog date is unchanged.', $result );
+			self::finish_sync_session( 'completed', $sync_type, $started, $result['message'], $catalog_date );
 			self::release_import_lock();
 
 			return $result;
@@ -73,6 +89,7 @@ class WTI_Importer {
 		if ( is_wp_error( $offers ) ) {
 			WTI_Logger::log( 'Offer parse failed.', array( 'error' => $offers->get_error_message() ) );
 			self::save_last_result( $started, array( 'status' => 'error', 'message' => $offers->get_error_message() ) );
+			self::finish_sync_session( 'error', $sync_type, $started, $offers->get_error_message(), $catalog_date );
 			self::release_import_lock();
 
 			return $offers;
@@ -84,6 +101,19 @@ class WTI_Importer {
 		$summary         = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];
+		self::save_sync_session(
+			array(
+				'status'       => 'running',
+				'sync_type'    => $sync_type,
+				'started_at'   => $started,
+				'start_time'   => microtime( true ),
+				'catalog_date' => $catalog_date,
+				'total'        => (int) $summary['total_products'] + (int) $summary['deleted_products'],
+				'processed'    => 0,
+				'plan'         => $summary,
+				'settings'     => $settings,
+			)
+		);
 		$simple_offset   = isset( $args['simple_offset'] ) ? absint( $args['simple_offset'] ) : 0;
 		$variable_offset = isset( $args['variable_offset'] ) ? absint( $args['variable_offset'] ) : 0;
 		$simple_limit    = isset( $settings['import_limit'] ) ? absint( $settings['import_limit'] ) : 10;
@@ -151,6 +181,7 @@ class WTI_Importer {
 		self::save_last_catalog_date( $catalog_date );
 		WTI_Feed_Index::save_from_store( $catalog_date );
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
+		self::finish_sync_session( 'completed', $sync_type, $started, $result['message'], $catalog_date, $execution );
 		self::release_import_lock();
 
 		return $result;
@@ -206,6 +237,7 @@ class WTI_Importer {
 
 		$session = array(
 			'status'              => 'running',
+			'sync_type'           => 'manual',
 			'started_at'          => $started,
 			'start_time'          => microtime( true ),
 			'catalog_date'        => isset( $meta['date'] ) ? $meta['date'] : '',
@@ -453,6 +485,7 @@ class WTI_Importer {
 
 		return array(
 			'status'             => isset( $session['status'] ) ? $session['status'] : '',
+			'sync_type'          => isset( $session['sync_type'] ) ? $session['sync_type'] : '',
 			'total'              => isset( $session['total'] ) ? (int) $session['total'] : 0,
 			'total_simple'       => isset( $session['total_simple'] ) ? (int) $session['total_simple'] : 0,
 			'total_variable'     => isset( $session['total_variable'] ) ? (int) $session['total_variable'] : 0,
@@ -628,6 +661,61 @@ class WTI_Importer {
 		set_transient( self::IMPORT_LOCK_TRANSIENT, time(), 3 * HOUR_IN_SECONDS );
 
 		return true;
+	}
+
+	private static function save_sync_session( $session ) {
+		$defaults = array(
+			'status'             => 'running',
+			'sync_type'          => 'manual',
+			'started_at'         => current_time( 'mysql' ),
+			'start_time'         => microtime( true ),
+			'catalog_date'       => '',
+			'total'              => 0,
+			'total_simple'       => 0,
+			'total_variable'     => 0,
+			'total_deleted'      => 0,
+			'total_variations'   => 0,
+			'processed'          => 0,
+			'simple_offset'      => 0,
+			'variable_offset'    => 0,
+			'deleted_offset'     => 0,
+			'created_simple'     => 0,
+			'updated_simple'     => 0,
+			'created_variable'   => 0,
+			'updated_variable'   => 0,
+			'created_variation'  => 0,
+			'updated_variation'  => 0,
+			'imported_images'    => 0,
+			'reused_images'      => 0,
+			'skipped_images'     => 0,
+			'skipped_unchanged'  => 0,
+			'deleted_outofstock' => 0,
+			'errors'             => 0,
+			'error_samples'      => array(),
+		);
+
+		update_option( self::IMPORT_SESSION_OPTION, wp_parse_args( $session, $defaults ), false );
+	}
+
+	private static function finish_sync_session( $status, $sync_type, $started, $message = '', $catalog_date = '', $execution = array() ) {
+		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
+		$session = is_array( $session ) ? $session : array();
+		$session['status']      = $status;
+		$session['sync_type']   = $sync_type;
+		$session['started_at']  = isset( $session['started_at'] ) ? $session['started_at'] : $started;
+		$session['finished_at'] = current_time( 'mysql' );
+		$session['message']     = $message;
+
+		if ( '' !== $catalog_date ) {
+			$session['catalog_date'] = $catalog_date;
+		}
+
+		if ( is_array( $execution ) ) {
+			self::merge_execution_into_session( $session, $execution );
+			$session['processed'] = isset( $session['total'] ) ? (int) $session['total'] : 0;
+		}
+
+		update_option( self::IMPORT_SESSION_OPTION, $session, false );
 	}
 
 	private static function refresh_import_lock() {

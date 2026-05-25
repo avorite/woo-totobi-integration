@@ -158,6 +158,20 @@
 				return;
 			}
 
+			if (data.sync_type === 'automatic') {
+				isProcessing = false;
+				isPaused = true;
+				$('#wti-progress-wrap').show();
+				$('#wti-start-import').prop('disabled', true);
+				$('#wti-pause-import').hide();
+				$('#wti-resume-import').hide();
+				$('#wti-reset-import').hide();
+				updateProgress(data);
+				updateStatus(t('automaticRunning', 'Automatic sync is running.'));
+				addLog(t('automaticRunning', 'Automatic sync is running.'));
+				return;
+			}
+
 			isProcessing = false;
 			isPaused = true;
 			$('#wti-progress-wrap').show();

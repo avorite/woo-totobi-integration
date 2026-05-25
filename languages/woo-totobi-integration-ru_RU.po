@@ -298,3 +298,6 @@ msgstr "Сессия синхронизации сброшена."
 msgid "Sync was interrupted. Continue?"
 msgstr "Синхронизация была прервана. Продолжить?"
 
+msgid "Automatic sync is running."
+msgstr "Идет автоматическая синхронизация."
+
