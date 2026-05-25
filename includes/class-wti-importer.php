@@ -651,7 +651,7 @@ class WTI_Importer {
 		}
 
 		if ( ! wp_next_scheduled( WTI_CRON_CONTINUE_HOOK ) ) {
-			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, WTI_CRON_CONTINUE_HOOK );
+			wp_schedule_single_event( time() + 15, WTI_CRON_CONTINUE_HOOK );
 		}
 	}
 
