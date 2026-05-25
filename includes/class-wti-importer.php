@@ -301,7 +301,7 @@ class WTI_Importer {
 		$full_plan    = $plan;
 		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false );
 		$plan         = $index_result['plan'];
-		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $full_plan ) : array();
+		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];

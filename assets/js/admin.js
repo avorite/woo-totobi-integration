@@ -216,7 +216,7 @@
 
 	function pollAutomaticProgress() {
 		$.post(wtiAdmin.ajaxUrl, {
-			action: 'wti_run_automatic_batch',
+			action: 'wti_get_progress',
 			_wpnonce: wtiAdmin.nonce
 		}).done(function (response) {
 			if (!response.success || !response.data || response.data.sync_type !== 'automatic' || (response.data.status !== 'running' && response.data.status !== 'paused')) {
