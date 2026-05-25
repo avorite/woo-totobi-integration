@@ -122,7 +122,7 @@ class WTI_Importer {
 		$plan            = WTI_Parser::build_import_plan( $offers );
 		$import_images   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
 		$full_plan       = $plan;
-		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, false );
+		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ) );
 		$plan            = $index_result['plan'];
 		$media_plan      = $import_images ? self::build_media_plan( $plan ) : array();
 		$summary         = WTI_Parser::summarize_plan( $plan );
@@ -299,7 +299,7 @@ class WTI_Importer {
 		$plan         = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
 		$full_plan    = $plan;
-		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false );
+		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ) );
 		$plan         = $index_result['plan'];
 		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
@@ -385,7 +385,7 @@ class WTI_Importer {
 		$plan    = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
 		$full_plan    = $plan;
-		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false );
+		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ) );
 		$plan         = $index_result['plan'];
 		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
@@ -938,6 +938,16 @@ class WTI_Importer {
 			'name'     => isset( $offer['name'] ) ? (string) $offer['name'] : '',
 			'pictures' => isset( $offer['pictures'] ) ? (array) $offer['pictures'] : array(),
 		);
+	}
+
+	private static function should_mark_missing_outofstock( $settings ) {
+		return isset( $settings['mark_missing_outofstock'] ) && 'yes' === $settings['mark_missing_outofstock'];
+	}
+
+	private static function missing_product_category_ids( $settings ) {
+		$map = isset( $settings['category_map'] ) && is_array( $settings['category_map'] ) ? $settings['category_map'] : array();
+
+		return array_values( array_unique( array_filter( array_map( 'absint', $map ) ) ) );
 	}
 
 	private static function build_validation_summary( $plan ) {

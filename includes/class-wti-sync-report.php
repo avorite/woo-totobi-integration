@@ -21,7 +21,8 @@ class WTI_Sync_Report {
 		}
 
 		fwrite( $fh, "\xEF\xBB\xBF" );
-		fputcsv( $fh, array( 'Type', 'Action', 'Product', 'SKU', 'Site URL', 'Details' ) );
+		fwrite( $fh, "sep=;\r\n" );
+		fputcsv( $fh, array( 'Type', 'Action', 'Product', 'SKU', 'Site URL', 'Details' ), ';' );
 		fclose( $fh );
 		self::rotate();
 
@@ -49,7 +50,8 @@ class WTI_Sync_Report {
 					isset( $row['sku'] ) ? $row['sku'] : '',
 					isset( $row['url'] ) ? $row['url'] : '',
 					isset( $row['details'] ) ? $row['details'] : '',
-				)
+				),
+				';'
 			);
 		}
 

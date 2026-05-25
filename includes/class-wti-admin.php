@@ -16,6 +16,7 @@ class WTI_Admin {
 			'variable_limit'  => 8,
 			'import_images'   => 'yes',
 			'product_status'  => 'publish',
+			'mark_missing_outofstock' => 'no',
 			'selected_paths'  => self::get_default_totobi_paths(),
 			'category_map'    => array(),
 		);
@@ -138,6 +139,7 @@ class WTI_Admin {
 		$raw_paths = isset( $_POST['selected_paths'] ) ? (array) wp_unslash( $_POST['selected_paths'] ) : array();
 		$paths     = array_values( array_intersect( array_map( 'sanitize_text_field', $raw_paths ), self::get_default_totobi_paths() ) );
 		$category_mode = isset( $_POST['category_mode'] ) && 'manual' === $_POST['category_mode'] ? 'manual' : 'auto';
+		$current_settings = self::get_settings();
 
 		$settings = array(
 			'feed_url'       => isset( $_POST['feed_url'] ) ? esc_url_raw( wp_unslash( $_POST['feed_url'] ) ) : WTI_Feed_Client::DEFAULT_PROM_FEED_URL,
@@ -151,8 +153,9 @@ class WTI_Admin {
 			'variable_limit' => 8,
 			'import_images'  => 'yes',
 			'product_status' => 'publish',
+			'mark_missing_outofstock' => isset( $_POST['mark_missing_outofstock'] ) && 'yes' === $_POST['mark_missing_outofstock'] ? 'yes' : 'no',
 			'selected_paths' => 'manual' === $category_mode && $paths ? $paths : self::get_default_totobi_paths(),
-			'category_map'   => 'manual' === $category_mode ? self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ) : array(),
+			'category_map'   => 'manual' === $category_mode ? self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ) : ( isset( $current_settings['category_map'] ) && is_array( $current_settings['category_map'] ) ? $current_settings['category_map'] : array() ),
 		);
 
 		update_option( WTI_OPTION_KEY, $settings, false );
@@ -260,6 +263,11 @@ class WTI_Admin {
 						<th scope="row"><?php esc_html_e( 'Product update mode', WTI_TEXT_DOMAIN ); ?></th>
 						<td>
 							<p><?php esc_html_e( 'Products are published automatically. Images are imported from Totobi and unchanged products are skipped.', WTI_TEXT_DOMAIN ); ?></p>
+							<label>
+								<input type="checkbox" name="mark_missing_outofstock" value="yes" <?php checked( $settings['mark_missing_outofstock'], 'yes' ); ?>>
+								<?php esc_html_e( 'Set products missing from the Totobi list out of stock in selected categories', WTI_TEXT_DOMAIN ); ?>
+							</label>
+							<p class="description"><?php esc_html_e( 'Disabled by default. When enabled, products in the selected WooCommerce categories that are not found in the current Totobi feed are set to out of stock with quantity 0.', WTI_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
 				</table>

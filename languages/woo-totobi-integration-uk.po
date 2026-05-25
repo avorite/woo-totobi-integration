@@ -76,6 +76,12 @@ msgstr "Режим оновлення товарів"
 msgid "Products are published automatically. Images are imported from Totobi and unchanged products are skipped."
 msgstr "Товари публікуються автоматично. Зображення імпортуються з Totobi, а незмінені товари пропускаються."
 
+msgid "Set products missing from the Totobi list out of stock in selected categories"
+msgstr "Ставити товари, яких немає у списку Totobi, не в наявності у вибраних категоріях"
+
+msgid "Disabled by default. When enabled, products in the selected WooCommerce categories that are not found in the current Totobi feed are set to out of stock with quantity 0."
+msgstr "За замовчуванням вимкнено. Якщо увімкнути, товари у вибраних категоріях WooCommerce, яких немає у поточному фіді Totobi, отримають статус не в наявності та кількість 0."
+
 msgid "Save settings"
 msgstr "Зберегти налаштування"
 

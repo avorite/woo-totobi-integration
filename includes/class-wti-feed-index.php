@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
 class WTI_Feed_Index {
 	const OPTION_KEY = 'wti_feed_index';
 
-	public static function filter_changed_plan( $plan, $import_images = true ) {
+	public static function filter_changed_plan( $plan, $import_images = true, $mark_missing_outofstock = false, $category_ids = array() ) {
 		$previous      = get_option( self::OPTION_KEY, array() );
 		$previous_rows = isset( $previous['offers'] ) && is_array( $previous['offers'] ) ? $previous['offers'] : array();
 		$current_rows  = self::build_plan_rows( $plan );
@@ -46,7 +46,7 @@ class WTI_Feed_Index {
 			$filtered['variable'][] = $variable;
 		}
 
-		$filtered['deleted'] = self::find_deleted_products( $previous_rows, $current_rows );
+		$filtered['deleted'] = $mark_missing_outofstock ? self::find_deleted_products( $previous_rows, $current_rows, $category_ids ) : array();
 
 		return array(
 			'plan'      => $filtered,
@@ -143,10 +143,15 @@ class WTI_Feed_Index {
 		return '' !== $expected_image_hash && ! empty( $previous['image_hash'] ) && (string) $previous['image_hash'] === $expected_image_hash;
 	}
 
-	private static function find_deleted_products( $previous_rows, $current_rows ) {
+	private static function find_deleted_products( $previous_rows, $current_rows, $category_ids = array() ) {
 		$deleted = array();
+		$current_product_ids = array();
 
 		foreach ( $previous_rows as $offer_id => $row ) {
+			if ( isset( $current_rows[ $offer_id ] ) && ! empty( $row['product_id'] ) ) {
+				$current_product_ids[] = (int) $row['product_id'];
+			}
+
 			if ( isset( $current_rows[ $offer_id ] ) || empty( $row['product_id'] ) ) {
 				continue;
 			}
@@ -157,6 +162,46 @@ class WTI_Feed_Index {
 			);
 		}
 
+		foreach ( self::find_products_missing_from_categories( array_unique( $current_product_ids ), $category_ids ) as $product_id ) {
+			if ( isset( $deleted[ $product_id ] ) ) {
+				continue;
+			}
+
+			$deleted[ $product_id ] = array(
+				'product_id' => (int) $product_id,
+				'offer_id'   => (string) get_post_meta( $product_id, WTI_Product_Sync::META_OFFER_ID, true ),
+			);
+		}
+
 		return array_values( $deleted );
+	}
+
+	private static function find_products_missing_from_categories( $current_product_ids, $category_ids ) {
+		$category_ids = array_values( array_filter( array_map( 'absint', (array) $category_ids ) ) );
+
+		if ( empty( $category_ids ) ) {
+			return array();
+		}
+
+		$query = new WP_Query(
+			array(
+				'fields'         => 'ids',
+				'post_type'      => 'product',
+				'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
+				'posts_per_page' => -1,
+				'post__not_in'   => array_map( 'absint', (array) $current_product_ids ),
+				'no_found_rows'  => true,
+				'tax_query'      => array(
+					array(
+						'taxonomy'         => 'product_cat',
+						'field'            => 'term_id',
+						'terms'            => $category_ids,
+						'include_children' => true,
+					),
+				),
+			)
+		);
+
+		return array_map( 'absint', $query->posts );
 	}
 }
