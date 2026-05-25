@@ -103,6 +103,82 @@ class WTI_Product_Sync {
 		return $actions;
 	}
 
+	public static function offer_needs_image_sync( $offer ) {
+		if ( empty( $offer['pictures'] ) || ! class_exists( 'WTI_Image_Sync' ) ) {
+			return false;
+		}
+
+		$product_id = self::find_product_id_by_offer_id( isset( $offer['id'] ) ? (string) $offer['id'] : '' );
+
+		if ( ! $product_id ) {
+			return true;
+		}
+
+		$current_image_set  = (string) get_post_meta( $product_id, WTI_Image_Sync::META_IMAGE_SET_HASH, true );
+		$expected_image_set = WTI_Image_Sync::build_image_set_hash_from_urls( $offer['pictures'] );
+
+		return '' === $current_image_set || $current_image_set !== $expected_image_set;
+	}
+
+	public static function sync_offer_images_batch( $offers, $dry_run = false ) {
+		$result = array(
+			'status'             => $dry_run ? 'dry_run' : 'written',
+			'processed'          => 0,
+			'created_simple'     => 0,
+			'updated_simple'     => 0,
+			'created_variable'   => 0,
+			'updated_variable'   => 0,
+			'created_variation'  => 0,
+			'updated_variation'  => 0,
+			'skipped_unchanged'  => 0,
+			'deleted_outofstock' => 0,
+			'imported_images'    => 0,
+			'reused_images'      => 0,
+			'skipped_images'     => 0,
+			'report_rows'        => array(),
+			'image_errors'       => array(),
+			'errors'             => array(),
+		);
+
+		foreach ( (array) $offers as $offer ) {
+			$result['processed']++;
+
+			if ( $dry_run ) {
+				continue;
+			}
+
+			$product_id = self::find_product_id_by_offer_id( isset( $offer['offer_id'] ) ? (string) $offer['offer_id'] : '' );
+
+			if ( ! $product_id ) {
+				$result['errors'][] = array(
+					'action' => 'sync_images',
+					'sku'    => isset( $offer['sku'] ) ? $offer['sku'] : '',
+					'error'  => 'Product not found for image sync.',
+				);
+				continue;
+			}
+
+			$product = wc_get_product( $product_id );
+
+			if ( ! $product ) {
+				$result['errors'][] = array(
+					'action' => 'sync_images',
+					'sku'    => isset( $offer['sku'] ) ? $offer['sku'] : '',
+					'error'  => 'Product could not be loaded for image sync.',
+				);
+				continue;
+			}
+
+			$image_result = WTI_Image_Sync::sync_product_images( $product, isset( $offer['pictures'] ) ? $offer['pictures'] : array() );
+			$product->save();
+			self::merge_image_result( $result, array( 'image_result' => $image_result ) );
+
+			$result['report_rows'][] = self::build_report_row( isset( $offer['type'] ) ? $offer['type'] : 'media', 'sync_images', $offer, $product_id, 'Images synchronized.' );
+		}
+
+		return $result;
+	}
+
 	public static function execute_action_plan( $actions, $args = array() ) {
 		$args = wp_parse_args(
 			$args,
@@ -712,6 +788,10 @@ class WTI_Product_Sync {
 		}
 
 		return (int) wc_get_product_id_by_sku( $sku );
+	}
+
+	private static function find_product_id_by_offer_id( $offer_id ) {
+		return self::find_product_id_by_meta( self::META_OFFER_ID, $offer_id, array( 'product', 'product_variation' ) );
 	}
 
 	private static function find_unclaimed_product_id_by_exact_title( $title ) {

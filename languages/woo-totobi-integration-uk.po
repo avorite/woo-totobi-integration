@@ -286,6 +286,9 @@ msgstr "варіативні товари"
 msgid "missing products"
 msgstr "відсутні товари"
 
+msgid "product images"
+msgstr "зображення товарів"
+
 msgid "Processing %stage%: %processed% of %total%"
 msgstr "Обробка: %stage%, %processed% із %total%"
 
@@ -300,4 +303,3 @@ msgstr "Синхронізацію було перервано. Продовжи
 
 msgid "Automatic sync is running."
 msgstr "Йде автоматична синхронізація."
-

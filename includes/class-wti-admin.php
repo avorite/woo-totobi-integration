@@ -102,6 +102,7 @@ class WTI_Admin {
 					'simpleProducts'  => __( 'simple products', WTI_TEXT_DOMAIN ),
 					'variableProducts'=> __( 'variable products', WTI_TEXT_DOMAIN ),
 					'deletedProducts' => __( 'missing products', WTI_TEXT_DOMAIN ),
+					'mediaProducts'   => __( 'product images', WTI_TEXT_DOMAIN ),
 					'processingStage' => __( 'Processing %stage%: %processed% of %total%', WTI_TEXT_DOMAIN ),
 					'resetConfirm'    => __( 'Reset the current sync session?', WTI_TEXT_DOMAIN ),
 					'resetDone'       => __( 'Sync session reset.', WTI_TEXT_DOMAIN ),

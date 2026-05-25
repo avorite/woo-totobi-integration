@@ -240,7 +240,7 @@
 	}
 
 	function statusText(data) {
-		var stage = data.stage === 'deleted' ? t('deletedProducts', 'missing products') : (data.stage === 'variable' ? t('variableProducts', 'variable products') : t('simpleProducts', 'simple products'));
+		var stage = data.stage === 'media' ? t('mediaProducts', 'product images') : (data.stage === 'deleted' ? t('deletedProducts', 'missing products') : (data.stage === 'variable' ? t('variableProducts', 'variable products') : t('simpleProducts', 'simple products')));
 		return t('processingStage', 'Processing %stage%: %processed% of %total%', {
 			stage: stage,
 			processed: data.processed || 0,

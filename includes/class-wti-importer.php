@@ -4,6 +4,7 @@ defined( 'ABSPATH' ) || exit;
 
 class WTI_Importer {
 	const IMPORT_PLAN_TRANSIENT = 'wti_import_plan';
+	const MEDIA_PLAN_TRANSIENT = 'wti_media_plan';
 	const IMPORT_SESSION_OPTION = 'wti_import_session';
 	const IMPORT_LOCK_TRANSIENT = 'wti_import_lock';
 
@@ -108,8 +109,10 @@ class WTI_Importer {
 		}
 
 		$plan            = WTI_Parser::build_import_plan( $offers );
-		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] );
+		$import_images   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
+		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, false );
 		$plan            = $index_result['plan'];
+		$media_plan      = $import_images ? self::build_media_plan( $plan ) : array();
 		$summary         = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];
@@ -120,8 +123,10 @@ class WTI_Importer {
 				'started_at'   => $started,
 				'start_time'   => microtime( true ),
 				'catalog_date' => $catalog_date,
-				'total'        => (int) $summary['total_products'] + (int) $summary['deleted_products'],
+				'total'        => (int) $summary['total_products'] + (int) $summary['deleted_products'] + count( $media_plan ),
 				'processed'    => 0,
+				'total_media'  => count( $media_plan ),
+				'media_offset' => 0,
 				'plan'         => $summary,
 				'settings'     => $settings,
 			)
@@ -163,7 +168,7 @@ class WTI_Importer {
 				'deleted_limit'  => isset( $plan['deleted'] ) ? count( $plan['deleted'] ) : 0,
 				'simple_offset'  => 0,
 				'variable_offset' => 0,
-				'import_images'  => isset( $settings['import_images'] ) && 'yes' === $settings['import_images'],
+				'import_images'  => false,
 				'product_status' => isset( $settings['product_status'] ) ? $settings['product_status'] : 'draft',
 			)
 		);
@@ -280,15 +285,17 @@ class WTI_Importer {
 
 		$plan         = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
-		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] );
+		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false );
 		$plan         = $index_result['plan'];
+		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];
 		$summary['feed_total_products'] = (int) $full_summary['total_products'];
-		$total = (int) $summary['simple_products'] + (int) $summary['variable_products'] + (int) $summary['deleted_products'];
+		$total = (int) $summary['simple_products'] + (int) $summary['variable_products'] + (int) $summary['deleted_products'] + count( $media_plan );
 
 		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 2 * HOUR_IN_SECONDS );
+		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 2 * HOUR_IN_SECONDS );
 
 		self::save_sync_session(
 			array(
@@ -304,6 +311,8 @@ class WTI_Importer {
 				'total_variable'     => (int) $summary['variable_products'],
 				'total_deleted'      => (int) $summary['deleted_products'],
 				'total_variations'   => (int) $summary['variations'],
+				'total_media'        => count( $media_plan ),
+				'media_offset'       => 0,
 				'skipped_unchanged'  => (int) $summary['unchanged_products'],
 				'report_file'        => class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::create() : '',
 				'plan'               => $summary,
@@ -361,13 +370,14 @@ class WTI_Importer {
 
 		$plan    = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
-		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] );
+		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false );
 		$plan         = $index_result['plan'];
+		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']   = (int) $index_result['unchanged'];
 		$summary['deleted_products']     = (int) $index_result['deleted'];
 		$summary['feed_total_products']  = (int) $full_summary['total_products'];
-		$total        = (int) $summary['simple_products'] + (int) $summary['variable_products'] + (int) $summary['deleted_products'];
+		$total        = (int) $summary['simple_products'] + (int) $summary['variable_products'] + (int) $summary['deleted_products'] + count( $media_plan );
 		$feed_total   = (int) $full_summary['simple_products'] + (int) $full_summary['variable_products'];
 
 		if ( $feed_total < 1 ) {
@@ -375,6 +385,7 @@ class WTI_Importer {
 		}
 
 		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 2 * HOUR_IN_SECONDS );
+		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 2 * HOUR_IN_SECONDS );
 
 		$session = array(
 			'status'              => 'running',
@@ -389,10 +400,12 @@ class WTI_Importer {
 			'total_variable'      => (int) $summary['variable_products'],
 			'total_deleted'       => (int) $summary['deleted_products'],
 			'total_variations'    => (int) $summary['variations'],
+			'total_media'         => count( $media_plan ),
 			'processed'           => 0,
 			'simple_offset'       => 0,
 			'variable_offset'     => 0,
 			'deleted_offset'      => 0,
+			'media_offset'        => 0,
 			'created_simple'      => 0,
 			'updated_simple'      => 0,
 			'created_variable'    => 0,
@@ -426,10 +439,15 @@ class WTI_Importer {
 	private static function process_stored_batch( $simple_size = null, $variable_size = null, $send_json = true ) {
 		self::refresh_import_lock();
 
-		$plan = get_transient( self::IMPORT_PLAN_TRANSIENT );
+		$plan       = get_transient( self::IMPORT_PLAN_TRANSIENT );
+		$media_plan = get_transient( self::MEDIA_PLAN_TRANSIENT );
 		if ( ! is_array( $plan ) ) {
 			self::release_import_lock();
 			return self::batch_error( 'Import session expired. Start import again.', $send_json );
+		}
+
+		if ( ! is_array( $media_plan ) ) {
+			$media_plan = array();
 		}
 
 		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
@@ -453,6 +471,7 @@ class WTI_Importer {
 		$simple_total   = count( $plan['simple'] );
 		$variable_total = count( $plan['variable'] );
 		$deleted_total  = isset( $plan['deleted'] ) && is_array( $plan['deleted'] ) ? count( $plan['deleted'] ) : 0;
+		$media_total    = count( $media_plan );
 		$batch_plan     = $plan;
 		$stage          = 'simple';
 
@@ -471,32 +490,40 @@ class WTI_Importer {
 			$stage = 'deleted';
 			$batch_plan['deleted'] = array_slice( $plan['deleted'], (int) $session['deleted_offset'], 50 );
 			$session['deleted_offset'] += count( $batch_plan['deleted'] );
+		} elseif ( ( $session['media_offset'] ?? 0 ) < $media_total ) {
+			$stage       = 'media';
+			$media_batch = array_slice( $media_plan, (int) $session['media_offset'], 2 );
+			$session['media_offset'] += count( $media_batch );
 		}
 
-		if ( empty( $batch_plan['simple'] ) && empty( $batch_plan['variable'] ) && empty( $batch_plan['deleted'] ) ) {
+		if ( empty( $media_batch ) ) {
+			$media_batch = array();
+		}
+
+		if ( empty( $batch_plan['simple'] ) && empty( $batch_plan['variable'] ) && empty( $batch_plan['deleted'] ) && empty( $media_batch ) ) {
 			return self::complete_ajax_session( $session, array(), '', $send_json );
 		}
 
-		$actions = WTI_Product_Sync::build_action_plan(
+		$actions = empty( $media_batch ) ? WTI_Product_Sync::build_action_plan(
 			$batch_plan,
 			array(
 				'dry_run'      => ! empty( $session['dry_run'] ),
 				'catalog_date' => $session['catalog_date'],
 				'category_map' => isset( $settings['category_map'] ) ? $settings['category_map'] : array(),
 			)
-		);
+		) : array();
 
-		$execution = WTI_Product_Sync::execute_action_plan(
+		$execution = empty( $media_batch ) ? WTI_Product_Sync::execute_action_plan(
 			$actions,
 			array(
 				'dry_run'        => ! empty( $session['dry_run'] ),
 				'import_limit'   => count( $batch_plan['simple'] ),
 				'variable_limit' => count( $batch_plan['variable'] ),
 				'deleted_limit'  => count( $batch_plan['deleted'] ),
-				'import_images'  => $import_images,
+				'import_images'  => false,
 				'product_status' => isset( $settings['product_status'] ) ? $settings['product_status'] : 'draft',
 			)
-		);
+		) : WTI_Product_Sync::sync_offer_images_batch( $media_batch, ! empty( $session['dry_run'] ) );
 
 		if ( is_wp_error( $execution ) ) {
 			self::release_import_lock();
@@ -507,10 +534,12 @@ class WTI_Importer {
 		if ( ! empty( $session['report_file'] ) && ! empty( $execution['report_rows'] ) && class_exists( 'WTI_Sync_Report' ) ) {
 			WTI_Sync_Report::append_rows( $session['report_file'], $execution['report_rows'] );
 		}
-		$session['processed'] = min( $session['total'], (int) $session['simple_offset'] + (int) $session['variable_offset'] + (int) $session['deleted_offset'] );
+		WTI_Feed_Index::save_from_store( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
+
+		$session['processed'] = min( $session['total'], (int) $session['simple_offset'] + (int) $session['variable_offset'] + (int) $session['deleted_offset'] + (int) ( $session['media_offset'] ?? 0 ) );
 		$session['status']    = 'running';
 
-		if ( $session['simple_offset'] >= $simple_total && $session['variable_offset'] >= $variable_total && $session['deleted_offset'] >= $deleted_total ) {
+		if ( $session['simple_offset'] >= $simple_total && $session['variable_offset'] >= $variable_total && $session['deleted_offset'] >= $deleted_total && ( $session['media_offset'] ?? 0 ) >= $media_total ) {
 			return self::complete_ajax_session( $session, $execution, $stage, $send_json );
 		}
 
@@ -562,6 +591,7 @@ class WTI_Importer {
 	public static function handle_ajax_reset() {
 		self::check_ajax_request();
 		delete_transient( self::IMPORT_PLAN_TRANSIENT );
+		delete_transient( self::MEDIA_PLAN_TRANSIENT );
 		delete_option( self::IMPORT_SESSION_OPTION );
 		self::unschedule_automatic_continue();
 		self::release_import_lock();
@@ -605,6 +635,7 @@ class WTI_Importer {
 
 		update_option( self::IMPORT_SESSION_OPTION, $session, false );
 		delete_transient( self::IMPORT_PLAN_TRANSIENT );
+		delete_transient( self::MEDIA_PLAN_TRANSIENT );
 		self::release_import_lock();
 
 		$result = array(
@@ -679,11 +710,13 @@ class WTI_Importer {
 			'total_simple'       => isset( $session['total_simple'] ) ? (int) $session['total_simple'] : 0,
 			'total_variable'     => isset( $session['total_variable'] ) ? (int) $session['total_variable'] : 0,
 			'total_deleted'      => isset( $session['total_deleted'] ) ? (int) $session['total_deleted'] : 0,
+			'total_media'        => isset( $session['total_media'] ) ? (int) $session['total_media'] : 0,
 			'total_variations'   => isset( $session['total_variations'] ) ? (int) $session['total_variations'] : 0,
 			'processed'          => isset( $session['processed'] ) ? (int) $session['processed'] : 0,
 			'simple_offset'      => isset( $session['simple_offset'] ) ? (int) $session['simple_offset'] : 0,
 			'variable_offset'    => isset( $session['variable_offset'] ) ? (int) $session['variable_offset'] : 0,
 			'deleted_offset'     => isset( $session['deleted_offset'] ) ? (int) $session['deleted_offset'] : 0,
+			'media_offset'       => isset( $session['media_offset'] ) ? (int) $session['media_offset'] : 0,
 			'created_simple'     => isset( $session['created_simple'] ) ? (int) $session['created_simple'] : 0,
 			'updated_simple'     => isset( $session['updated_simple'] ) ? (int) $session['updated_simple'] : 0,
 			'created_variable'   => isset( $session['created_variable'] ) ? (int) $session['created_variable'] : 0,
@@ -739,6 +772,16 @@ class WTI_Importer {
 			$entries[] = sprintf( 'Missing Totobi products marked out of stock: %d.', (int) $execution['deleted_outofstock'] );
 		}
 
+		if ( 'media' === $stage ) {
+			$entries[] = sprintf(
+				'Images batch: %d downloaded, %d reused, %d unchanged; errors %d.',
+				isset( $execution['imported_images'] ) ? (int) $execution['imported_images'] : 0,
+				isset( $execution['reused_images'] ) ? (int) $execution['reused_images'] : 0,
+				isset( $execution['skipped_images'] ) ? (int) $execution['skipped_images'] : 0,
+				isset( $execution['errors'] ) && is_array( $execution['errors'] ) ? count( $execution['errors'] ) : 0
+			);
+		}
+
 		$samples = array();
 
 		if ( ! empty( $actions['simple'] ) ) {
@@ -764,6 +807,36 @@ class WTI_Importer {
 			'simple_samples'   => isset( $actions['simple'] ) ? array_slice( $actions['simple'], 0, 5 ) : array(),
 			'variable_samples' => isset( $actions['variable'] ) ? array_slice( $actions['variable'], 0, 5 ) : array(),
 			'variation_samples' => isset( $actions['variations'] ) ? array_slice( $actions['variations'], 0, 5 ) : array(),
+		);
+	}
+
+	private static function build_media_plan( $plan ) {
+		$media_plan = array();
+
+		foreach ( isset( $plan['simple'] ) ? $plan['simple'] : array() as $offer ) {
+			if ( ! empty( $offer['pictures'] ) ) {
+				$media_plan[] = self::media_offer_row( $offer, 'simple' );
+			}
+		}
+
+		foreach ( isset( $plan['variable'] ) ? $plan['variable'] : array() as $variable ) {
+			$parent = isset( $variable['parent'] ) ? $variable['parent'] : array();
+
+			if ( ! empty( $parent['pictures'] ) ) {
+				$media_plan[] = self::media_offer_row( $parent, 'variable' );
+			}
+		}
+
+		return $media_plan;
+	}
+
+	private static function media_offer_row( $offer, $type ) {
+		return array(
+			'type'     => $type,
+			'offer_id' => isset( $offer['id'] ) ? (string) $offer['id'] : '',
+			'sku'      => isset( $offer['sku'] ) ? (string) $offer['sku'] : '',
+			'name'     => isset( $offer['name'] ) ? (string) $offer['name'] : '',
+			'pictures' => isset( $offer['pictures'] ) ? (array) $offer['pictures'] : array(),
 		);
 	}
 
@@ -831,6 +904,7 @@ class WTI_Importer {
 			if ( $age > 15 * MINUTE_IN_SECONDS ) {
 				self::release_import_lock();
 				delete_transient( self::IMPORT_PLAN_TRANSIENT );
+				delete_transient( self::MEDIA_PLAN_TRANSIENT );
 				delete_option( self::IMPORT_SESSION_OPTION );
 				$status = '';
 			}
@@ -844,6 +918,7 @@ class WTI_Importer {
 
 		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
 		if ( is_array( $session ) && in_array( isset( $session['status'] ) ? (string) $session['status'] : '', array( 'running', 'paused' ), true ) && ! get_transient( self::IMPORT_PLAN_TRANSIENT ) ) {
+			delete_transient( self::MEDIA_PLAN_TRANSIENT );
 			delete_option( self::IMPORT_SESSION_OPTION );
 		}
 
@@ -863,11 +938,13 @@ class WTI_Importer {
 			'total_simple'       => 0,
 			'total_variable'     => 0,
 			'total_deleted'      => 0,
+			'total_media'        => 0,
 			'total_variations'   => 0,
 			'processed'          => 0,
 			'simple_offset'      => 0,
 			'variable_offset'    => 0,
 			'deleted_offset'     => 0,
+			'media_offset'       => 0,
 			'created_simple'     => 0,
 			'updated_simple'     => 0,
 			'created_variable'   => 0,
