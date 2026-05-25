@@ -277,7 +277,6 @@ class WTI_Admin {
 				<section class="wti-card">
 					<div class="wti-section-heading">
 						<h2><?php esc_html_e( 'Recent log', WTI_TEXT_DOMAIN ); ?></h2>
-						<p><?php esc_html_e( 'Latest technical events in a readable format.', WTI_TEXT_DOMAIN ); ?></p>
 					</div>
 					<?php self::render_log_summary(); ?>
 				</section>
@@ -348,7 +347,16 @@ class WTI_Admin {
 
 	private static function render_log_summary() {
 		$tail  = trim( WTI_Logger::read_tail( 5000 ) );
-		$lines = $tail ? array_slice( preg_split( '/\r\n|\r|\n/', $tail ), -8 ) : array();
+		$lines = $tail ? preg_split( '/\r\n|\r|\n/', $tail ) : array();
+		$lines = array_values(
+			array_filter(
+				$lines,
+				function ( $line ) {
+					return preg_match( '/^\[[^\]]+\]\s*/', trim( (string) $line ) );
+				}
+			)
+		);
+		$lines = array_slice( $lines, -8 );
 
 		if ( empty( $lines ) ) {
 			echo '<p class="description">' . esc_html__( 'No log entries yet.', WTI_TEXT_DOMAIN ) . '</p>';
@@ -389,9 +397,23 @@ class WTI_Admin {
 	private static function clean_log_message( $message ) {
 		$message = preg_replace( '/\s*\{.*$/', '', (string) $message );
 		$message = trim( $message );
+		$map     = array(
+			'AJAX import started.'        => __( 'Sync started.', WTI_TEXT_DOMAIN ),
+			'AJAX import completed.'      => __( 'Sync completed.', WTI_TEXT_DOMAIN ),
+			'Sync scaffold started.'      => __( 'Feed check started.', WTI_TEXT_DOMAIN ),
+			'Sync scaffold completed.'    => __( 'Feed check completed.', WTI_TEXT_DOMAIN ),
+			'Feed fetch failed.'          => __( 'Could not download Totobi feed.', WTI_TEXT_DOMAIN ),
+			'Feed parse failed.'          => __( 'Could not read Totobi feed.', WTI_TEXT_DOMAIN ),
+			'Offer parse failed.'         => __( 'Could not read product list.', WTI_TEXT_DOMAIN ),
+			'Scheduled sync skipped because catalog date is unchanged.' => __( 'Automatic sync skipped because Totobi data did not change.', WTI_TEXT_DOMAIN ),
+		);
+
+		if ( isset( $map[ $message ] ) ) {
+			return $map[ $message ];
+		}
 
 		if ( '' === $message ) {
-			return __( 'Technical details recorded.', WTI_TEXT_DOMAIN );
+			return __( 'Sync event recorded.', WTI_TEXT_DOMAIN );
 		}
 
 		return wp_html_excerpt( $message, 180, '...' );

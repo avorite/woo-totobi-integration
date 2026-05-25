@@ -133,9 +133,6 @@ msgstr "Короткий результат останнього запуску 
 msgid "Recent log"
 msgstr "Останні події"
 
-msgid "Latest technical events in a readable format."
-msgstr "Останні технічні події у зрозумілому вигляді."
-
 msgid "Status"
 msgstr "Статус"
 
@@ -169,8 +166,26 @@ msgstr "Записів журналу ще немає."
 msgid "Log"
 msgstr "Журнал"
 
-msgid "Technical details recorded."
-msgstr "Технічні деталі записано."
+msgid "Sync event recorded."
+msgstr "Подію синхронізації записано."
+
+msgid "Feed check started."
+msgstr "Перевірку фіда розпочато."
+
+msgid "Feed check completed."
+msgstr "Перевірку фіда завершено."
+
+msgid "Could not download Totobi feed."
+msgstr "Не вдалося завантажити фід Totobi."
+
+msgid "Could not read Totobi feed."
+msgstr "Не вдалося прочитати фід Totobi."
+
+msgid "Could not read product list."
+msgstr "Не вдалося прочитати список товарів."
+
+msgid "Automatic sync skipped because Totobi data did not change."
+msgstr "Автоматичну синхронізацію пропущено: дані Totobi не змінилися."
 
 msgid "Completed"
 msgstr "Завершено"

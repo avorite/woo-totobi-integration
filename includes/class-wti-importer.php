@@ -343,7 +343,13 @@ class WTI_Importer {
 
 	public static function handle_ajax_progress() {
 		self::check_ajax_request();
-		wp_send_json_success( self::session_response( get_option( self::IMPORT_SESSION_OPTION, array() ) ) );
+		$response = self::session_response( get_option( self::IMPORT_SESSION_OPTION, array() ) );
+		$plan     = get_transient( self::IMPORT_PLAN_TRANSIENT );
+
+		$response['can_resume'] = in_array( $response['status'], array( 'running', 'paused' ), true ) && is_array( $plan );
+		$response['plan_exists'] = is_array( $plan );
+
+		wp_send_json_success( $response );
 	}
 
 	public static function handle_ajax_pause() {
@@ -606,6 +612,11 @@ class WTI_Importer {
 			}
 
 			self::release_import_lock();
+		}
+
+		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
+		if ( is_array( $session ) && in_array( isset( $session['status'] ) ? (string) $session['status'] : '', array( 'running', 'paused' ), true ) && ! get_transient( self::IMPORT_PLAN_TRANSIENT ) ) {
+			delete_option( self::IMPORT_SESSION_OPTION );
 		}
 
 		set_transient( self::IMPORT_LOCK_TRANSIENT, time(), 3 * HOUR_IN_SECONDS );
