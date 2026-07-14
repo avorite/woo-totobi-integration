@@ -17,6 +17,7 @@ class WTI_Admin {
 			'import_images'   => 'yes',
 			'product_status'  => 'publish',
 			'mark_missing_outofstock' => 'no',
+			'license_key'     => '',
 			'selected_paths'  => self::get_default_totobi_paths(),
 			'category_map'    => array(),
 		);
@@ -30,6 +31,9 @@ class WTI_Admin {
 			'/podorozh-ta-vdpochinok/termosi-ta-termokruzhki/',
 			'/odyag/reglani/',
 			'/odyag/zhiletki/',
+			'/odyag/polo/',
+			'/golovn-ubori/kepki-ta-panami/',
+			'/sumki/ryukzaki/',
 			'/ofs-uk/bloknoti/',
 			'/elektronka/godinniki/',
 			'/elektronka/zaryadn-pristro/',
@@ -39,26 +43,136 @@ class WTI_Admin {
 
 	public static function get_known_totobi_categories() {
 		return array(
-			'187' => array( 'name' => 'Металеві ручки', 'path' => '/ruchki/' ),
-			'188' => array( 'name' => 'Пластикові ручки', 'path' => '/ruchki/' ),
-			'269' => array( 'name' => 'Еко ручки', 'path' => '/ruchki/' ),
-			'314' => array( 'name' => 'Олівці', 'path' => '/ruchki/' ),
-			'287' => array( 'name' => 'Ліхтарики', 'path' => '/podorozh-ta-vdpochinok/lhtariki/' ),
-			'184' => array( 'name' => 'Пляшки для пиття', 'path' => '/podorozh-ta-vdpochinok/plyashki-dlya-pittya/' ),
-			'185' => array( 'name' => 'Термоси та термокружки', 'path' => '/podorozh-ta-vdpochinok/termosi-ta-termokruzhki/' ),
-			'246' => array( 'name' => 'Реглани, фліси', 'path' => '/odyag/reglani/' ),
-			'215' => array( 'name' => 'Жилети', 'path' => '/odyag/zhiletki/' ),
-			'205' => array( 'name' => 'Записні книжки', 'path' => '/ofs-uk/bloknoti/' ),
-			'298' => array( 'name' => 'Годинники', 'path' => '/elektronka/godinniki/' ),
-			'251' => array( 'name' => 'Зарядні пристрої', 'path' => '/elektronka/zaryadn-pristro/' ),
-			'282' => array( 'name' => 'Подарункова коробка', 'path' => '/upakovka-uk/podarunkova-upakovka/' ),
+			'187' => array( 'name' => 'Металеві ручки', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-ruchok/metaleva-ruchka/' ),
+			'188' => array( 'name' => 'Пластикові ручки', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-ruchok/plastikova-ruchka/' ),
+			'269' => array( 'name' => 'Еко ручки', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-ruchok/eko-ruchka/' ),
+			'314' => array( 'name' => 'Олівці', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-ruchok/olivtsi/' ),
+			'287' => array( 'name' => 'Ліхтарики', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-lihtariv/' ),
+			'184' => array( 'name' => 'Пляшки для пиття', 'path' => '/brenduvannya-suvenirnoi-produkczii/druk-na-plyashkah/' ),
+			'185' => array( 'name' => 'Термоси та термокружки', 'path' => '/brenduvannya-suvenirnoi-produkczii/druk-na-termokruzhkah/' ),
+			'246' => array( 'name' => 'Реглани, фліси', 'path' => '/druk-na-odyazi-ta-tkanini/druk-na-tolstovkakh-khudi/' ),
+			'215' => array( 'name' => 'Жилети', 'path' => '/druk-na-odyazi-ta-tkanini/druk-na-zhyletakh/' ),
+			'238' => array( 'name' => 'Поло', 'path' => '/druk-na-odyazi-ta-tkanini/druk-na-polo/' ),
+			'226' => array( 'name' => 'Кепки', 'path' => '/druk-na-odyazi-ta-tkanini/druk-na-kepkakh/' ),
+			'304' => array( 'name' => 'Рюкзаки', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-ryukzakiv/' ),
+			'205' => array( 'name' => 'Записні книжки', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-shhodennikiv-bloknotiv/' ),
+			'298' => array( 'name' => 'Годинники', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-godynnykiv/' ),
+			'251' => array( 'name' => 'Зарядні пристрої', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-zaryadnyh-prystroyiv/' ),
+			'282' => array( 'name' => 'Подарункова коробка', 'path' => '/brenduvannya-suvenirnoi-produkczii/brenduvannya-podarunkovyh-korobok/' ),
 		);
 	}
 
 	public static function get_settings() {
 		$settings = get_option( WTI_OPTION_KEY, array() );
+		$settings = is_array( $settings ) ? $settings : array();
 
-		return wp_parse_args( is_array( $settings ) ? $settings : array(), self::get_default_settings() );
+		if ( isset( $settings['sync_interval'] ) && 'wti_six_hours' === $settings['sync_interval'] ) {
+			$settings['sync_interval'] = WTI_Scheduler::SCHEDULE_EIGHT_HOURS;
+		}
+
+		$settings = wp_parse_args( $settings, self::get_default_settings() );
+
+		if ( 'manual' !== $settings['category_mode'] ) {
+			$settings['selected_paths'] = self::get_default_totobi_paths();
+			$settings['category_map'] = self::get_automatic_category_map();
+		}
+
+		return $settings;
+	}
+
+	public static function get_automatic_category_map() {
+		$slug_map = array(
+			'187' => array( 'ruchki', 'metaleva-ruchka' ),
+			'188' => array( 'ruchki', 'plastikova-ruchka' ),
+			'269' => array( 'ruchki', 'eko-ruchka' ),
+			'314' => array( 'olivtsi', 'brenduvannya-ruchok', 'ruchki', 'druk-na-ruchkah' ),
+			'287' => array( 'brenduvannya-lihtariv', 'lhtariki', 'brenduvannya-suvenirnoi-produkczii' ),
+			'184' => array( 'druk-na-plyashkah', 'plyashki-dlya-pittya', 'brenduvannya-suvenirnoi-produkczii' ),
+			'185' => array( 'druk-na-termokruzhkah', 'druk-na-termosah', 'termosi-ta-termokruzhki', 'brenduvannya-suvenirnoi-produkczii' ),
+			'246' => array( 'druk-na-tolstovkakh-khudi', 'druk-na-svitshotakh' ),
+			'215' => array( 'zhiletki', 'druk-na-zhyletakh' ),
+			'238' => array( 'druk-na-polo', 'druk-na-futbolkah', 'druk-na-odyazi-ta-tkanini' ),
+			'226' => array( 'druk-na-kepkakh', 'rizne', 'brenduvannya-suvenirnoi-produkczii' ),
+			'304' => array( 'brenduvannya-ryukzakiv', 'druk-na-ryukzakah', 'rizne', 'brenduvannya-suvenirnoi-produkczii' ),
+			'205' => array( 'brenduvannya-shhodennikiv-bloknotiv', 'brenduvannya-bloknotiv', 'bloknoty', 'brenduvannya-suvenirnoi-produkczii' ),
+			'298' => array( 'brenduvannya-godynnykiv', 'godinniki', 'brenduvannya-suvenirnoi-produkczii' ),
+			'251' => array( 'brenduvannya-zaryadnyh-prystroyiv', 'zaryadn-pristro', 'brenduvannya-suvenirnoi-produkczii' ),
+			'282' => array( 'brenduvannya-podarunkovyh-korobok', 'podarunkova-upakovka', 'brenduvannya-suvenirnoi-produkczii' ),
+		);
+
+		$map = array();
+
+		foreach ( $slug_map as $totobi_id => $slugs ) {
+			foreach ( $slugs as $slug ) {
+				$term_id = self::resolve_automatic_category_term_id( $slug );
+
+				if ( $term_id ) {
+					$map[ $totobi_id ] = $term_id;
+					break;
+				}
+			}
+		}
+
+		return $map;
+	}
+
+	private static function get_feed_category_names_for_admin() {
+		$cached = get_transient( 'wti_admin_feed_category_names' );
+
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$settings = get_option( WTI_OPTION_KEY, array() );
+		$settings = is_array( $settings ) ? $settings : array();
+		$url      = isset( $settings['feed_url'] ) && $settings['feed_url'] ? $settings['feed_url'] : WTI_Feed_Client::DEFAULT_PROM_FEED_URL;
+		$xml      = WTI_Feed_Client::fetch( $url );
+
+		if ( is_wp_error( $xml ) ) {
+			return array();
+		}
+
+		$categories = WTI_Parser::parse_categories( $xml );
+
+		if ( is_wp_error( $categories ) || ! is_array( $categories ) ) {
+			return array();
+		}
+
+		$names = array();
+
+		foreach ( $categories as $id => $category ) {
+			if ( isset( $category['name'] ) && '' !== trim( (string) $category['name'] ) ) {
+				$names[ (string) $id ] = trim( (string) $category['name'] );
+			}
+		}
+
+		set_transient( 'wti_admin_feed_category_names', $names, HOUR_IN_SECONDS );
+
+		return $names;
+	}
+
+	private static function resolve_automatic_category_term_id( $slug ) {
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'product_cat',
+				'hide_empty' => false,
+				'slug'       => $slug,
+			)
+		);
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return 0;
+		}
+
+		if ( function_exists( 'pll_get_term_language' ) ) {
+			foreach ( $terms as $term ) {
+				if ( 'uk' === pll_get_term_language( $term->term_id ) ) {
+					return (int) $term->term_id;
+				}
+			}
+		}
+
+		return (int) $terms[0]->term_id;
 	}
 
 	public static function add_admin_menu() {
@@ -105,8 +219,6 @@ class WTI_Admin {
 					'deletedProducts' => __( 'missing products', WTI_TEXT_DOMAIN ),
 					'mediaProducts'   => __( 'product images', WTI_TEXT_DOMAIN ),
 					'processingStage' => __( 'Processing %stage%: %processed% of %total%', WTI_TEXT_DOMAIN ),
-					'resetConfirm'    => __( 'Reset the current sync session?', WTI_TEXT_DOMAIN ),
-					'resetDone'       => __( 'Sync session reset.', WTI_TEXT_DOMAIN ),
 					'interrupted'     => __( 'Sync was interrupted. Continue?', WTI_TEXT_DOMAIN ),
 					'automaticRunning'=> __( 'Automatic sync is running.', WTI_TEXT_DOMAIN ),
 				),
@@ -140,6 +252,7 @@ class WTI_Admin {
 		$paths     = array_values( array_intersect( array_map( 'sanitize_text_field', $raw_paths ), self::get_default_totobi_paths() ) );
 		$category_mode = isset( $_POST['category_mode'] ) && 'manual' === $_POST['category_mode'] ? 'manual' : 'auto';
 		$current_settings = self::get_settings();
+		$current_category_map = isset( $current_settings['category_map'] ) && is_array( $current_settings['category_map'] ) ? $current_settings['category_map'] : array();
 
 		$settings = array(
 			'feed_url'       => isset( $_POST['feed_url'] ) ? esc_url_raw( wp_unslash( $_POST['feed_url'] ) ) : WTI_Feed_Client::DEFAULT_PROM_FEED_URL,
@@ -147,26 +260,35 @@ class WTI_Admin {
 			'category_mode'  => $category_mode,
 			'markup_percent' => isset( $_POST['markup_percent'] ) ? (string) max( 0, (float) wc_format_decimal( wp_unslash( $_POST['markup_percent'] ) ) ) : '0',
 			'sync_time'      => isset( $_POST['sync_time'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_time'] ) ) : '17:00',
-			'sync_interval'  => isset( $_POST['sync_interval'] ) && in_array( $_POST['sync_interval'], array( WTI_Scheduler::SCHEDULE_FOUR_HOURS, WTI_Scheduler::SCHEDULE_SIX_HOURS, 'daily' ), true ) ? sanitize_key( wp_unslash( $_POST['sync_interval'] ) ) : WTI_Scheduler::SCHEDULE_FOUR_HOURS,
+			'sync_interval'  => isset( $_POST['sync_interval'] ) && in_array( $_POST['sync_interval'], array( WTI_Scheduler::SCHEDULE_FOUR_HOURS, WTI_Scheduler::SCHEDULE_EIGHT_HOURS, WTI_Scheduler::SCHEDULE_TWELVE_HOURS, 'daily' ), true ) ? sanitize_key( wp_unslash( $_POST['sync_interval'] ) ) : WTI_Scheduler::SCHEDULE_FOUR_HOURS,
 			'dry_run'        => 'no',
 			'import_limit'   => 50,
 			'variable_limit' => 8,
 			'import_images'  => 'yes',
 			'product_status' => 'publish',
 			'mark_missing_outofstock' => isset( $_POST['mark_missing_outofstock'] ) && 'yes' === $_POST['mark_missing_outofstock'] ? 'yes' : 'no',
+			'license_key'    => isset( $_POST['license_key'] ) ? sanitize_text_field( wp_unslash( $_POST['license_key'] ) ) : '',
 			'selected_paths' => 'manual' === $category_mode && $paths ? $paths : self::get_default_totobi_paths(),
-			'category_map'   => 'manual' === $category_mode ? self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ) : ( isset( $current_settings['category_map'] ) && is_array( $current_settings['category_map'] ) ? $current_settings['category_map'] : array() ),
+			'category_map'   => 'manual' === $category_mode ? self::sanitize_category_map( isset( $_POST['category_map'] ) ? (array) wp_unslash( $_POST['category_map'] ) : array() ) : self::get_automatic_category_map(),
 		);
 
 		update_option( WTI_OPTION_KEY, $settings, false );
+		if ( class_exists( 'WTI_License' ) ) {
+			WTI_License::clear_cache();
+		}
 	}
 
 	private static function redirect_with_notice( $notice ) {
+		$notice = sanitize_key( $notice );
+		$token  = wp_generate_password( 12, false, false );
+
+		set_transient( 'wti_admin_notice_' . get_current_user_id() . '_' . $token, $notice, MINUTE_IN_SECONDS );
+
 		wp_safe_redirect(
 			add_query_arg(
 				array(
-					'page'       => 'wti-totobi-integration',
-					'wti_notice' => $notice,
+					'page'             => 'wti-totobi-integration',
+					'wti_notice_token' => $token,
 				),
 				admin_url( 'admin.php' )
 			)
@@ -178,7 +300,9 @@ class WTI_Admin {
 		$settings    = self::get_settings();
 		$last_result = get_option( 'wti_last_result', array() );
 		$next_run    = wp_next_scheduled( WTI_CRON_HOOK );
-		$notice      = isset( $_GET['wti_notice'] ) ? sanitize_key( wp_unslash( $_GET['wti_notice'] ) ) : '';
+		$notice      = self::pop_admin_notice();
+		$notice_url  = remove_query_arg( 'wti_notice_token' );
+		$license_status = class_exists( 'WTI_License' ) ? WTI_License::check( isset( $settings['license_key'] ) ? $settings['license_key'] : '' ) : array();
 
 		?>
 		<div class="wrap wti-admin">
@@ -189,6 +313,11 @@ class WTI_Admin {
 
 			<?php if ( $notice ) : ?>
 				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( self::notice_text( $notice ) ); ?></p></div>
+				<script>
+					if (window.history && window.history.replaceState) {
+						window.history.replaceState({}, document.title, <?php echo wp_json_encode( esc_url_raw( $notice_url ) ); ?>);
+					}
+				</script>
 			<?php endif; ?>
 
 			<?php self::render_manual_sync_panel(); ?>
@@ -202,6 +331,16 @@ class WTI_Admin {
 				</div>
 
 				<table class="form-table" role="presentation">
+					<tr class="wti-license-row">
+						<th scope="row"><label for="license_key"><?php esc_html_e( 'License key', WTI_TEXT_DOMAIN ); ?></label></th>
+						<td>
+							<input type="text" class="regular-text code" id="license_key" name="license_key" value="<?php echo esc_attr( $settings['license_key'] ); ?>">
+							<p class="description">
+								<strong><?php echo esc_html( class_exists( 'WTI_License' ) ? WTI_License::status_label( $license_status ) : __( 'Unknown', WTI_TEXT_DOMAIN ) ); ?>.</strong>
+								<?php echo esc_html( isset( $license_status['message'] ) ? $license_status['message'] : '' ); ?>
+							</p>
+						</td>
+					</tr>
 					<tr>
 						<th scope="row"><label for="feed_url"><?php esc_html_e( 'Prom YML feed URL', WTI_TEXT_DOMAIN ); ?></label></th>
 						<td><input type="url" class="regular-text code" id="feed_url" name="feed_url" value="<?php echo esc_attr( $settings['feed_url'] ); ?>"></td>
@@ -253,7 +392,8 @@ class WTI_Admin {
 						<td>
 							<select id="sync_interval" name="sync_interval">
 								<option value="<?php echo esc_attr( WTI_Scheduler::SCHEDULE_FOUR_HOURS ); ?>" <?php selected( $settings['sync_interval'], WTI_Scheduler::SCHEDULE_FOUR_HOURS ); ?>><?php esc_html_e( 'Every 4 hours', WTI_TEXT_DOMAIN ); ?></option>
-								<option value="<?php echo esc_attr( WTI_Scheduler::SCHEDULE_SIX_HOURS ); ?>" <?php selected( $settings['sync_interval'], WTI_Scheduler::SCHEDULE_SIX_HOURS ); ?>><?php esc_html_e( 'Every 6 hours', WTI_TEXT_DOMAIN ); ?></option>
+								<option value="<?php echo esc_attr( WTI_Scheduler::SCHEDULE_EIGHT_HOURS ); ?>" <?php selected( $settings['sync_interval'], WTI_Scheduler::SCHEDULE_EIGHT_HOURS ); ?>><?php esc_html_e( 'Every 8 hours', WTI_TEXT_DOMAIN ); ?></option>
+								<option value="<?php echo esc_attr( WTI_Scheduler::SCHEDULE_TWELVE_HOURS ); ?>" <?php selected( $settings['sync_interval'], WTI_Scheduler::SCHEDULE_TWELVE_HOURS ); ?>><?php esc_html_e( 'Every 12 hours', WTI_TEXT_DOMAIN ); ?></option>
 								<option value="daily" <?php selected( $settings['sync_interval'], 'daily' ); ?>><?php esc_html_e( 'Daily', WTI_TEXT_DOMAIN ); ?></option>
 							</select>
 							<p class="description"><?php esc_html_e( 'Totobi Prom YML is checked on this interval. If the catalog date has not changed, the automatic sync is skipped.', WTI_TEXT_DOMAIN ); ?></p>
@@ -307,7 +447,6 @@ class WTI_Admin {
 					<button type="button" class="button button-primary" id="wti-start-import"><?php esc_html_e( 'Start sync', WTI_TEXT_DOMAIN ); ?></button>
 					<button type="button" class="button" id="wti-pause-import" style="display:none;"><?php esc_html_e( 'Pause', WTI_TEXT_DOMAIN ); ?></button>
 					<button type="button" class="button" id="wti-resume-import" style="display:none;"><?php esc_html_e( 'Resume', WTI_TEXT_DOMAIN ); ?></button>
-					<button type="button" class="button" id="wti-reset-import" style="display:none;"><?php esc_html_e( 'Reset sync', WTI_TEXT_DOMAIN ); ?></button>
 				</div>
 			</div>
 			<div id="wti-progress-wrap" class="wti-progress-wrap" style="display:none;">
@@ -359,7 +498,22 @@ class WTI_Admin {
 	}
 
 	private static function render_log_summary() {
-		$tail  = trim( WTI_Logger::read_tail( 5000 ) );
+		$session = get_option( 'wti_import_session', array() );
+		if ( is_array( $session ) && ! empty( $session['log_entries'] ) && is_array( $session['log_entries'] ) ) {
+			$time = ! empty( $session['finished_at'] ) ? (string) $session['finished_at'] : ( ! empty( $session['updated_at'] ) ? (string) $session['updated_at'] : '' );
+
+			echo '<ol class="wti-log-tail">';
+			foreach ( array_slice( $session['log_entries'], -8 ) as $message ) {
+				echo '<li>';
+				echo '<span class="wti-log-time">' . esc_html( $time ) . '</span>';
+				echo '<span class="wti-log-message">' . esc_html( (string) $message ) . '</span>';
+				echo '</li>';
+			}
+			echo '</ol>';
+			return;
+		}
+
+		$tail  = trim( WTI_Logger::read_tail( 100000 ) );
 		$lines = $tail ? preg_split( '/\r\n|\r|\n/', $tail ) : array();
 		$lines = array_values(
 			array_filter(
@@ -460,6 +614,21 @@ class WTI_Admin {
 		return isset( $messages[ $notice ] ) ? $messages[ $notice ] : '';
 	}
 
+	private static function pop_admin_notice() {
+		$user_id = get_current_user_id();
+		$token   = isset( $_GET['wti_notice_token'] ) ? sanitize_key( wp_unslash( $_GET['wti_notice_token'] ) ) : '';
+
+		if ( ! $user_id || '' === $token ) {
+			return '';
+		}
+
+		$key    = 'wti_admin_notice_' . $user_id . '_' . $token;
+		$notice = sanitize_key( (string) get_transient( $key ) );
+		delete_transient( $key );
+
+		return $notice;
+	}
+
 	private static function sanitize_category_map( $raw_map ) {
 		$map   = array();
 		$known = self::get_known_totobi_categories();
@@ -490,20 +659,22 @@ class WTI_Admin {
 
 		$terms = self::sort_terms_for_select( $terms );
 		$map   = isset( $settings['category_map'] ) && is_array( $settings['category_map'] ) ? $settings['category_map'] : array();
+		$feed_category_names = self::get_feed_category_names_for_admin();
 
 		echo '<table class="widefat striped wti-category-map"><thead><tr>';
 		echo '<th>' . esc_html__( 'Totobi ID', WTI_TEXT_DOMAIN ) . '</th>';
 		echo '<th>' . esc_html__( 'Totobi category', WTI_TEXT_DOMAIN ) . '</th>';
-		echo '<th>' . esc_html__( 'Client path', WTI_TEXT_DOMAIN ) . '</th>';
+		echo '<th>' . esc_html__( 'Шлях категорії AK' ) . '</th>';
 		echo '<th>' . esc_html__( 'WooCommerce category', WTI_TEXT_DOMAIN ) . '</th>';
 		echo '</tr></thead><tbody>';
 
 		foreach ( self::get_known_totobi_categories() as $totobi_id => $category ) {
 			$selected = isset( $map[ $totobi_id ] ) ? (int) $map[ $totobi_id ] : 0;
+			$totobi_name = isset( $feed_category_names[ (string) $totobi_id ] ) ? $feed_category_names[ (string) $totobi_id ] : $category['name'];
 
 			echo '<tr>';
 			echo '<td><code>' . esc_html( $totobi_id ) . '</code></td>';
-			echo '<td>' . esc_html( $category['name'] ) . '</td>';
+			echo '<td>' . esc_html( $totobi_name ) . '</td>';
 			echo '<td><code>' . esc_html( $category['path'] ) . '</code></td>';
 			echo '<td><select name="category_map[' . esc_attr( $totobi_id ) . ']">';
 			echo '<option value="0">' . esc_html__( 'Do not assign', WTI_TEXT_DOMAIN ) . '</option>';

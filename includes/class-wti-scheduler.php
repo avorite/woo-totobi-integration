@@ -4,7 +4,8 @@ defined( 'ABSPATH' ) || exit;
 
 class WTI_Scheduler {
 	const SCHEDULE_FOUR_HOURS = 'wti_four_hours';
-	const SCHEDULE_SIX_HOURS  = 'wti_six_hours';
+	const SCHEDULE_EIGHT_HOURS = 'wti_eight_hours';
+	const SCHEDULE_TWELVE_HOURS = 'wti_twelve_hours';
 
 	public static function add_cron_schedules( $schedules ) {
 		$schedules[ self::SCHEDULE_FOUR_HOURS ] = array(
@@ -12,9 +13,14 @@ class WTI_Scheduler {
 			'display'  => __( 'Every 4 hours', WTI_TEXT_DOMAIN ),
 		);
 
-		$schedules[ self::SCHEDULE_SIX_HOURS ] = array(
-			'interval' => 6 * HOUR_IN_SECONDS,
-			'display'  => __( 'Every 6 hours', WTI_TEXT_DOMAIN ),
+		$schedules[ self::SCHEDULE_EIGHT_HOURS ] = array(
+			'interval' => 8 * HOUR_IN_SECONDS,
+			'display'  => __( 'Every 8 hours', WTI_TEXT_DOMAIN ),
+		);
+
+		$schedules[ self::SCHEDULE_TWELVE_HOURS ] = array(
+			'interval' => 12 * HOUR_IN_SECONDS,
+			'display'  => __( 'Every 12 hours', WTI_TEXT_DOMAIN ),
 		);
 
 		return $schedules;
@@ -72,7 +78,12 @@ class WTI_Scheduler {
 			return $next->getTimestamp();
 		}
 
-		$step = self::SCHEDULE_SIX_HOURS === $recurrence ? '+6 hours' : '+4 hours';
+		$steps = array(
+			self::SCHEDULE_FOUR_HOURS   => '+4 hours',
+			self::SCHEDULE_EIGHT_HOURS  => '+8 hours',
+			self::SCHEDULE_TWELVE_HOURS => '+12 hours',
+		);
+		$step  = isset( $steps[ $recurrence ] ) ? $steps[ $recurrence ] : '+4 hours';
 
 		while ( $next <= $now ) {
 			$next = $next->modify( $step );
@@ -83,7 +94,11 @@ class WTI_Scheduler {
 
 	private static function get_recurrence( $settings ) {
 		$interval = isset( $settings['sync_interval'] ) ? $settings['sync_interval'] : self::SCHEDULE_FOUR_HOURS;
-		$allowed  = array( self::SCHEDULE_FOUR_HOURS, self::SCHEDULE_SIX_HOURS, 'daily' );
+		if ( 'wti_six_hours' === $interval ) {
+			$interval = self::SCHEDULE_EIGHT_HOURS;
+		}
+
+		$allowed = array( self::SCHEDULE_FOUR_HOURS, self::SCHEDULE_EIGHT_HOURS, self::SCHEDULE_TWELVE_HOURS, 'daily' );
 
 		return in_array( $interval, $allowed, true ) ? $interval : self::SCHEDULE_FOUR_HOURS;
 	}

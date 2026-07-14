@@ -10,6 +10,9 @@ class WTI_Parser {
 		'/podorozh-ta-vdpochinok/termosi-ta-termokruzhki/',
 		'/odyag/reglani/',
 		'/odyag/zhiletki/',
+		'/odyag/polo/',
+		'/golovn-ubori/kepki-ta-panami/',
+		'/sumki/ryukzaki/',
 		'/ofs-uk/bloknoti/',
 		'/elektronka/godinniki/',
 		'/elektronka/zaryadn-pristro/',
@@ -113,8 +116,10 @@ class WTI_Parser {
 	}
 
 	public static function build_import_plan( $offers ) {
+		$offers     = self::fill_missing_variation_prices( $offers );
+		$offers     = self::inherit_group_row_variation_data( $offers );
 		$validation = self::validate_offers( $offers );
-		$offers     = $validation['valid'];
+		$offers     = self::assign_color_group_ids( $validation['valid'] );
 		$groups     = array();
 		$simples    = array();
 
@@ -145,10 +150,12 @@ class WTI_Parser {
 
 			$variables[] = array(
 				'group_id'   => $group_id,
-				'parent'     => $parent,
+				'parent'     => self::prepare_parent_offer( $parent, $group_id ),
 				'variations' => $variations,
 			);
 		}
+
+		$simples = self::remove_simple_products_covered_by_variable_models( $simples, $variables );
 
 		return array(
 			'simple'         => $simples,
@@ -156,6 +163,119 @@ class WTI_Parser {
 			'skipped_groups' => $skipped_groups,
 			'validation'     => $validation,
 		);
+	}
+
+	private static function remove_simple_products_covered_by_variable_models( $simples, $variables ) {
+		$variable_keys = array();
+
+		foreach ( $variables as $variable ) {
+			if ( empty( $variable['parent'] ) || empty( $variable['variations'] ) ) {
+				continue;
+			}
+
+			$key = self::color_group_key( $variable['parent'] );
+
+			if ( '' !== $key ) {
+				$variable_keys[ $key ] = true;
+			}
+		}
+
+		if ( empty( $variable_keys ) ) {
+			return $simples;
+		}
+
+		return array_values(
+			array_filter(
+				$simples,
+				static function ( $simple ) use ( $variable_keys ) {
+					$key = self::color_group_key( $simple );
+
+					return '' === $key || empty( $variable_keys[ $key ] );
+				}
+			)
+		);
+	}
+
+	private static function fill_missing_variation_prices( $offers ) {
+		$group_prices = array();
+
+		foreach ( $offers as $offer ) {
+			if ( empty( $offer['group_id'] ) || empty( $offer['price'] ) || $offer['price'] <= 0 ) {
+				continue;
+			}
+
+			$group_id = (string) $offer['group_id'];
+
+			if ( empty( $group_prices[ $group_id ] ) || ! empty( $offer['is_group_row'] ) ) {
+				$group_prices[ $group_id ] = (float) $offer['price'];
+			}
+		}
+
+		foreach ( $offers as &$offer ) {
+			if ( empty( $offer['group_id'] ) || ! empty( $offer['is_group_row'] ) || ( isset( $offer['price'] ) && $offer['price'] > 0 ) ) {
+				continue;
+			}
+
+			$group_id = (string) $offer['group_id'];
+
+			if ( ! empty( $group_prices[ $group_id ] ) ) {
+				$offer['price'] = (float) $group_prices[ $group_id ];
+			}
+		}
+		unset( $offer );
+
+		return $offers;
+	}
+
+	private static function inherit_group_row_variation_data( $offers ) {
+		$group_rows = array();
+
+		foreach ( $offers as $offer ) {
+			if ( empty( $offer['is_group_row'] ) || empty( $offer['group_id'] ) ) {
+				continue;
+			}
+
+			$group_rows[ (string) $offer['group_id'] ] = $offer;
+		}
+
+		if ( empty( $group_rows ) ) {
+			return $offers;
+		}
+
+		foreach ( $offers as &$offer ) {
+			if ( ! empty( $offer['is_group_row'] ) || empty( $offer['group_id'] ) ) {
+				continue;
+			}
+
+			$group_id = (string) $offer['group_id'];
+
+			if ( empty( $group_rows[ $group_id ] ) ) {
+				continue;
+			}
+
+			$group_row = $group_rows[ $group_id ];
+
+			if ( empty( $offer['color'] ) && ! empty( $group_row['color'] ) ) {
+				$offer['color'] = $group_row['color'];
+			}
+
+			if ( empty( $offer['pictures'] ) && ! empty( $group_row['pictures'] ) ) {
+				$offer['pictures'] = $group_row['pictures'];
+			}
+
+			if ( empty( $offer['params']['Колір'] ) && ! empty( $group_row['color'] ) ) {
+				$offer['params']['Колір'] = $group_row['color'];
+			}
+
+			if ( empty( $offer['description'] ) && ! empty( $group_row['description'] ) ) {
+				$offer['description'] = $group_row['description'];
+			}
+
+			$offer['raw_hash'] = self::build_offer_hash( $offer );
+		}
+		unset( $offer );
+
+		return $offers;
 	}
 
 	public static function summarize_plan( $plan ) {
@@ -259,7 +379,7 @@ class WTI_Parser {
 		foreach ( $element->picture as $picture ) {
 			$url = trim( (string) $picture );
 
-			if ( '' !== $url ) {
+			if ( self::is_supported_image_url( $url ) ) {
 				$pictures[] = $url;
 			}
 		}
@@ -294,15 +414,43 @@ class WTI_Parser {
 			'weight'            => self::to_float( self::text( $element, 'weight' ) ),
 			'params'            => $params,
 			'size'              => isset( $params['Розмір'] ) ? $params['Розмір'] : '',
-			'color'             => isset( $params['Колір'] ) ? $params['Колір'] : '',
-			'raw_hash'          => md5( $xml ),
+			'color'             => self::resolve_color( $params, self::text( $element, 'vendorCode' ), (string) $attributes['id'] ),
 		);
 
 		$offer['is_group_row'] = '' !== $offer['group_id'] && $offer['id'] === $offer['group_id'];
 		$offer['sku']          = self::resolve_sku( $offer );
 		$offer['stock_status'] = $offer['available'] && $offer['quantity_in_stock'] > 0 ? 'instock' : 'outofstock';
+		$offer['raw_hash']     = self::build_offer_hash( $offer );
 
 		return $offer;
+	}
+
+	private static function build_offer_hash( $offer ) {
+		$params = isset( $offer['params'] ) && is_array( $offer['params'] ) ? $offer['params'] : array();
+		ksort( $params, SORT_NATURAL );
+
+		$data = array(
+			'id'                => isset( $offer['id'] ) ? (string) $offer['id'] : '',
+			'group_id'          => isset( $offer['group_id'] ) ? (string) $offer['group_id'] : '',
+			'available'         => ! empty( $offer['available'] ) ? 1 : 0,
+			'url'               => isset( $offer['url'] ) ? (string) $offer['url'] : '',
+			'quantity_in_stock' => isset( $offer['quantity_in_stock'] ) ? (int) $offer['quantity_in_stock'] : 0,
+			'price'             => isset( $offer['price'] ) ? wc_format_decimal( (float) $offer['price'] ) : '0',
+			'oldprice'          => isset( $offer['oldprice'] ) ? wc_format_decimal( (float) $offer['oldprice'] ) : '0',
+			'currency'          => isset( $offer['currency'] ) ? (string) $offer['currency'] : '',
+			'category_id'       => isset( $offer['category_id'] ) ? (string) $offer['category_id'] : '',
+			'name'              => isset( $offer['name'] ) ? (string) $offer['name'] : '',
+			'vendor_code'       => isset( $offer['vendor_code'] ) ? (string) $offer['vendor_code'] : '',
+			'description'       => isset( $offer['description'] ) ? (string) $offer['description'] : '',
+			'weight'            => isset( $offer['weight'] ) ? wc_format_decimal( (float) $offer['weight'] ) : '0',
+			'params'            => $params,
+			'size'              => isset( $offer['size'] ) ? (string) $offer['size'] : '',
+			'color'             => isset( $offer['color'] ) ? (string) $offer['color'] : '',
+			'sku'               => isset( $offer['sku'] ) ? (string) $offer['sku'] : '',
+			'stock_status'      => isset( $offer['stock_status'] ) ? (string) $offer['stock_status'] : '',
+		);
+
+		return md5( wp_json_encode( $data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 	}
 
 	private static function offer_allowed( $offer, $allowed_paths, $allowed_category_ids ) {
@@ -331,6 +479,91 @@ class WTI_Parser {
 		return false;
 	}
 
+	private static function assign_color_group_ids( $offers ) {
+		$buckets = array();
+
+		foreach ( $offers as $index => $offer ) {
+			if ( empty( $offer['color'] ) || empty( $offer['name'] ) ) {
+				continue;
+			}
+
+			if ( ! empty( $offer['group_id'] ) && ! self::should_group_by_model_color( $offer ) ) {
+				continue;
+			}
+
+			$key = self::color_group_key( $offer );
+			if ( '' === $key ) {
+				continue;
+			}
+
+			$buckets[ $key ][] = $index;
+		}
+
+		foreach ( $buckets as $key => $indexes ) {
+			if ( count( $indexes ) < 2 ) {
+				continue;
+			}
+
+			$colors = array();
+			foreach ( $indexes as $index ) {
+				$colors[] = mb_strtolower( trim( (string) $offers[ $index ]['color'] ) );
+			}
+
+			if ( count( array_unique( array_filter( $colors ) ) ) < 2 ) {
+				continue;
+			}
+
+			$group_id = 'wti-color-' . md5( $key );
+			foreach ( $indexes as $index ) {
+				$offers[ $index ]['group_id'] = $group_id;
+			}
+		}
+
+		return $offers;
+	}
+
+	private static function should_group_by_model_color( $offer ) {
+		$category_id = isset( $offer['category_id'] ) ? (string) $offer['category_id'] : '';
+
+		return in_array(
+			$category_id,
+			array( '184', '185', '187', '188', '205', '215', '226', '238', '246', '251', '304' ),
+			true
+		);
+	}
+
+	private static function color_group_key( $offer ) {
+		$name        = isset( $offer['name'] ) ? trim( (string) $offer['name'] ) : '';
+		$category_id = isset( $offer['category_id'] ) ? trim( (string) $offer['category_id'] ) : '';
+
+		if ( '' === $name || '' === $category_id ) {
+			return '';
+		}
+
+		return $category_id . '|' . mb_strtolower( preg_replace( '/\s+/u', ' ', $name ) );
+	}
+
+	private static function resolve_color( $params, $vendor_code = '', $offer_id = '' ) {
+		foreach ( array( 'Колір', 'Колiр', 'Цвет' ) as $key ) {
+			if ( isset( $params[ $key ] ) && '' !== trim( (string) $params[ $key ] ) ) {
+				return trim( (string) $params[ $key ] );
+			}
+		}
+
+		if ( isset( $params['Група Кольорів'] ) && '' !== trim( (string) $params['Група Кольорів'] ) ) {
+			$suffix_source = '' !== (string) $vendor_code ? (string) $vendor_code : (string) $offer_id;
+			$suffix        = '';
+
+			if ( preg_match( '/-([^-]+)$/', $suffix_source, $matches ) ) {
+				$suffix = $matches[1];
+			}
+
+			return trim( (string) $params['Група Кольорів'] . ( '' !== $suffix ? ' ' . $suffix : '' ) );
+		}
+
+		return '';
+	}
+
 	private static function pick_parent_offer( $offers ) {
 		foreach ( $offers as $offer ) {
 			if ( ! empty( $offer['is_group_row'] ) ) {
@@ -353,6 +586,19 @@ class WTI_Parser {
 		);
 
 		return reset( $offers );
+	}
+
+	private static function prepare_parent_offer( $parent, $group_id ) {
+		if ( 0 !== strpos( (string) $group_id, 'wti-color-' ) ) {
+			return $parent;
+		}
+
+		$parent['id']          = (string) $group_id;
+		$parent['sku']         = '';
+		$parent['vendor_code'] = '';
+		$parent['raw_hash']    = self::build_offer_hash( $parent );
+
+		return $parent;
 	}
 
 	private static function sort_variations( $offers ) {
@@ -413,6 +659,19 @@ class WTI_Parser {
 
 	private static function text( SimpleXMLElement $element, $name ) {
 		return isset( $element->{$name} ) ? trim( (string) $element->{$name} ) : '';
+	}
+
+	private static function is_supported_image_url( $url ) {
+		$parts = '' !== $url ? wp_parse_url( $url ) : false;
+
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) || empty( $parts['scheme'] ) || ! in_array( strtolower( $parts['scheme'] ), array( 'http', 'https' ), true ) ) {
+			return false;
+		}
+
+		$path      = isset( $parts['path'] ) ? (string) $parts['path'] : '';
+		$extension = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
+
+		return in_array( $extension, array( 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif' ), true );
 	}
 
 	private static function to_bool( $value ) {

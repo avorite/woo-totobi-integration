@@ -1,0 +1,116 @@
+.wd-swatches-product .wti-image-swatch {
+	width: 86px;
+	height: 72px;
+	min-width: 86px;
+	overflow: hidden;
+}
+
+.wd-swatches-product .wti-image-swatch .wti-image-swatch-bg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: 122% auto;
+}
+
+.wti-color-select-with-images {
+	position: absolute !important;
+	width: 1px !important;
+	height: 1px !important;
+	overflow: hidden !important;
+	clip: rect(1px, 1px, 1px, 1px) !important;
+	white-space: nowrap !important;
+}
+
+.variations .wti-color-variation-row {
+	display: block;
+	width: 100%;
+}
+
+.variations .wti-color-variation-row .label,
+.variations .wti-color-variation-row .value {
+	display: block;
+	width: 100% !important;
+	max-width: none !important;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.variations .wti-color-variation-row .label {
+	margin-bottom: 8px;
+}
+
+.variations .wti-color-variation-row .wd-swatches-product[data-id="pa_kolir"] {
+	display: flex !important;
+	flex-wrap: wrap;
+	gap: 10px 12px;
+	margin-top: 10px;
+	width: 100%;
+	max-width: 860px;
+}
+
+.wd-swatches-product .wti-image-swatch:hover,
+.wd-swatches-product .wti-image-swatch.is-selected,
+.wd-swatches-product .wti-image-swatch.wd-active {
+	border-color: #1e73be;
+	box-shadow: 0 0 0 1px #1e73be;
+}
+
+.wti-layout-pdf-tab {
+	font-size: 15px;
+	line-height: 1.5;
+}
+
+.wti-layout-pdf-tab p {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+}
+
+.wti-layout-pdf-file {
+	color: #333;
+}
+
+.wti-price-notice {
+	display: inline-flex;
+	align-items: center;
+	margin: 2px 0 14px;
+	padding: 7px 10px;
+	border-radius: 6px;
+	background: #f3f8ff;
+	color: #1d4f7a;
+	font-size: 13px;
+	line-height: 1.35;
+	font-weight: 600;
+}
+
+.summary .price.wti-dynamic-price,
+.woocommerce-variation-price .price.wti-dynamic-price {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.wti-dynamic-price-qty {
+	color: #667085;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+@media (max-width: 480px) {
+	.wd-swatches-product .wti-image-swatch,
+	.wti-select-image-swatch {
+		width: 70px;
+		height: 60px;
+		min-width: 70px;
+	}
+
+	.wti-price-notice {
+		display: flex;
+		width: 100%;
+	}
+}

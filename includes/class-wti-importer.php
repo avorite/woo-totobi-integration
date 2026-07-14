@@ -5,41 +5,71 @@ defined( 'ABSPATH' ) || exit;
 class WTI_Importer {
 	const IMPORT_PLAN_TRANSIENT = 'wti_import_plan';
 	const MEDIA_PLAN_TRANSIENT = 'wti_media_plan';
+	const IMPORT_PLAN_FILE = 'wti-import-plan.json';
+	const MEDIA_PLAN_FILE = 'wti-media-plan.json';
 	const IMPORT_SESSION_OPTION = 'wti_import_session';
 	const IMPORT_LOCK_TRANSIENT = 'wti_import_lock';
+	const BATCH_LOCK_OPTION = 'wti_batch_lock';
+	const STALE_SESSION_SECONDS = 2700;
+	const SIMPLE_BATCH_SIZE = 20;
+	const VARIABLE_BATCH_SIZE = 5;
+	const MAX_VARIATIONS_PER_BATCH = 150;
+	const MEDIA_BATCH_SIZE = 1;
+	const REUSED_MEDIA_BATCH_SIZE = 20;
 
 	public static function run_manual_sync() {
 		return self::run_sync( array( 'manual' => true ) );
 	}
 
 	public static function run_scheduled_sync() {
+		if ( class_exists( 'WTI_License' ) && ! WTI_License::is_valid() ) {
+			WTI_Logger::log( 'Scheduled sync skipped: inactive license.' );
+			return array( 'status' => 'license_inactive' );
+		}
+
 		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
-		$plan    = get_transient( self::IMPORT_PLAN_TRANSIENT );
+		$plan    = self::load_import_plan();
 
 		if ( is_array( $session ) && 'automatic' === ( $session['sync_type'] ?? '' ) && in_array( $session['status'] ?? '', array( 'running', 'paused' ), true ) && is_array( $plan ) ) {
-			return self::run_scheduled_batch();
+			self::schedule_background_continue();
+			return self::session_response( $session );
 		}
+
+		self::recover_stale_import_session( 'automatic' );
 
 		return self::start_scheduled_sync();
 	}
 
 	public static function run_scheduled_batch() {
+		return self::run_background_batch();
+	}
+
+	public static function run_background_batch() {
 		$result   = null;
 		$deadline = time() + 20;
 
 		do {
-			$result = self::process_stored_batch( 2, 2, false );
+			$result = self::process_stored_batch( self::SIMPLE_BATCH_SIZE, self::VARIABLE_BATCH_SIZE, false );
 
 			if ( is_wp_error( $result ) || ! empty( $result['completed'] ) ) {
 				return $result;
 			}
 		} while ( time() < $deadline );
 
+		self::schedule_background_continue( true );
+
 		return $result;
 	}
 
 	public static function run_sync( $args = array() ) {
 		$settings = WTI_Admin::get_settings();
+		if ( class_exists( 'WTI_License' ) && ! WTI_License::is_valid( $settings ) ) {
+			return array(
+				'status'  => 'error',
+				'message' => 'License is not active.',
+			);
+		}
+
 		$feed_url = ! empty( $settings['feed_url'] ) ? $settings['feed_url'] : WTI_Feed_Client::DEFAULT_PROM_FEED_URL;
 		$started = current_time( 'mysql' );
 		$sync_type = empty( $args['manual'] ) ? 'automatic' : 'manual';
@@ -48,6 +78,9 @@ class WTI_Importer {
 		if ( ! self::acquire_import_lock() ) {
 			return new WP_Error( 'sync_locked', 'Synchronization is already running.' );
 		}
+
+		self::cancel_pending_background_actions();
+		self::delete_plan_files();
 
 		self::save_sync_session(
 			array(
@@ -122,9 +155,9 @@ class WTI_Importer {
 		$plan            = WTI_Parser::build_import_plan( $offers );
 		$import_images   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
 		$full_plan       = $plan;
-		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ) );
+		$index_result    = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ), self::sync_price_args( $settings ) );
 		$plan            = $index_result['plan'];
-		$media_plan      = $import_images ? self::build_media_plan( $plan ) : array();
+		$media_plan      = $import_images ? self::build_media_plan( $full_plan, self::sync_price_args( $settings ) ) : array();
 		$summary         = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];
@@ -152,7 +185,7 @@ class WTI_Importer {
 
 		if ( $batch_mode ) {
 			$execution_plan['simple']   = $simple_limit > 0 ? array_slice( $plan['simple'], $simple_offset, $simple_limit ) : array();
-			$execution_plan['variable'] = $variable_limit > 0 ? array_slice( $plan['variable'], $variable_offset, $variable_limit ) : array();
+			$execution_plan['variable'] = self::select_variable_batch( $plan['variable'], $variable_offset, $variable_limit );
 		}
 
 		$actions = WTI_Product_Sync::build_action_plan(
@@ -176,8 +209,8 @@ class WTI_Importer {
 			$actions,
 			array(
 				'dry_run'        => 'yes' === $settings['dry_run'],
-				'import_limit'   => $simple_limit,
-				'variable_limit' => $variable_limit,
+				'import_limit'   => $batch_mode ? $simple_limit : max( 1, count( $execution_plan['simple'] ) ),
+				'variable_limit' => $batch_mode ? count( $execution_plan['variable'] ) : max( 1, count( $execution_plan['variable'] ) ),
 				'deleted_limit'  => isset( $plan['deleted'] ) ? count( $plan['deleted'] ) : 0,
 				'simple_offset'  => 0,
 				'variable_offset' => 0,
@@ -204,7 +237,7 @@ class WTI_Importer {
 
 		$result = array(
 			'status'       => 'ok',
-			'message'      => 'Dry-run parsed Totobi Prom YML. Product import is not implemented yet.',
+			'message'      => 'Sync completed.',
 			'catalog_date' => $catalog_date,
 			'offers'       => count( $offers ),
 			'plan'         => $summary,
@@ -221,7 +254,7 @@ class WTI_Importer {
 
 		self::save_last_result( $started, $result );
 		self::save_last_catalog_date( $catalog_date );
-		WTI_Feed_Index::save_from_store( $catalog_date );
+		WTI_Feed_Index::save_from_store( $catalog_date, self::sync_price_args( $settings ) );
 		self::flush_site_caches();
 		WTI_Logger::log( 'Sync scaffold completed.', $result );
 		self::finish_sync_session( 'completed', $sync_type, $started, $result['message'], $catalog_date, $execution );
@@ -232,12 +265,20 @@ class WTI_Importer {
 
 	private static function start_scheduled_sync() {
 		$settings  = WTI_Admin::get_settings();
+		if ( class_exists( 'WTI_License' ) && ! WTI_License::is_valid( $settings ) ) {
+			WTI_Logger::log( 'Scheduled sync skipped: inactive license.' );
+			return array( 'status' => 'license_inactive' );
+		}
+
 		$feed_url  = ! empty( $settings['feed_url'] ) ? $settings['feed_url'] : WTI_Feed_Client::DEFAULT_PROM_FEED_URL;
 		$started   = current_time( 'mysql' );
 
 		if ( ! self::acquire_import_lock() ) {
 			return new WP_Error( 'sync_locked', 'Synchronization is already running.' );
 		}
+
+		self::cancel_pending_background_actions();
+		self::delete_plan_files();
 
 		self::save_sync_session(
 			array(
@@ -300,17 +341,17 @@ class WTI_Importer {
 		$plan         = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
 		$full_plan    = $plan;
-		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ) );
+		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ), self::sync_price_args( $settings ) );
 		$plan         = $index_result['plan'];
-		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
+		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $full_plan, self::sync_price_args( $settings ) ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']  = (int) $index_result['unchanged'];
 		$summary['deleted_products']    = (int) $index_result['deleted'];
 		$summary['feed_total_products'] = (int) $full_summary['total_products'];
 		$total = (int) $summary['simple_products'] + (int) $summary['variable_products'] + (int) $summary['deleted_products'] + count( $media_plan );
 
-		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 12 * HOUR_IN_SECONDS );
-		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 12 * HOUR_IN_SECONDS );
+		self::save_import_plan( $plan );
+		self::save_media_plan( $media_plan );
 
 		self::save_sync_session(
 			array(
@@ -337,7 +378,9 @@ class WTI_Importer {
 
 		WTI_Logger::log( 'Scheduled AJAX-style import started.', array( 'total' => $total, 'catalog_date' => $catalog_date ) );
 
-		return self::process_stored_batch( 2, 2, false );
+		self::schedule_background_continue( true );
+
+		return self::session_response( get_option( self::IMPORT_SESSION_OPTION, array() ) );
 	}
 
 	public static function handle_ajax_start() {
@@ -347,7 +390,15 @@ class WTI_Importer {
 			wp_send_json_error( 'Synchronization is already running or paused. Resume and finish it before starting a new one.' );
 		}
 
+		self::cancel_pending_background_actions();
+		self::delete_plan_files();
+
 		$settings = WTI_Admin::get_settings();
+		if ( class_exists( 'WTI_License' ) && ! WTI_License::is_valid( $settings ) ) {
+			self::release_import_lock();
+			wp_send_json_error( 'License is not active.' );
+		}
+
 		$feed_url = ! empty( $settings['feed_url'] ) ? $settings['feed_url'] : WTI_Feed_Client::DEFAULT_PROM_FEED_URL;
 		$started = current_time( 'mysql' );
 
@@ -386,9 +437,9 @@ class WTI_Importer {
 		$plan    = WTI_Parser::build_import_plan( $offers );
 		$full_summary = WTI_Parser::summarize_plan( $plan );
 		$full_plan    = $plan;
-		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ) );
+		$index_result = WTI_Feed_Index::filter_changed_plan( $plan, false, self::should_mark_missing_outofstock( $settings ), self::missing_product_category_ids( $settings ), self::sync_price_args( $settings ) );
 		$plan         = $index_result['plan'];
-		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $plan ) : array();
+		$media_plan   = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'] ? self::build_media_plan( $full_plan, self::sync_price_args( $settings ) ) : array();
 		$summary      = WTI_Parser::summarize_plan( $plan );
 		$summary['unchanged_products']   = (int) $index_result['unchanged'];
 		$summary['deleted_products']     = (int) $index_result['deleted'];
@@ -400,13 +451,15 @@ class WTI_Importer {
 			self::fail_ajax_start( 'No products found for selected Totobi categories.' );
 		}
 
-		set_transient( self::IMPORT_PLAN_TRANSIENT, $plan, 12 * HOUR_IN_SECONDS );
-		set_transient( self::MEDIA_PLAN_TRANSIENT, $media_plan, 12 * HOUR_IN_SECONDS );
+		self::save_import_plan( $plan );
+		self::save_media_plan( $media_plan );
 
 		$session = array(
 			'status'              => 'running',
 			'sync_type'           => 'manual',
 			'started_at'          => $started,
+			'updated_at'          => current_time( 'mysql' ),
+			'updated_ts'          => time(),
 			'start_time'          => microtime( true ),
 			'catalog_date'        => isset( $meta['date'] ) ? $meta['date'] : '',
 			'dry_run'             => 'yes' === $settings['dry_run'],
@@ -442,6 +495,7 @@ class WTI_Importer {
 
 		update_option( self::IMPORT_SESSION_OPTION, $session, false );
 		WTI_Logger::log( 'AJAX import started.', array( 'total' => $total, 'unchanged' => (int) $summary['unchanged_products'], 'deleted' => (int) $summary['deleted_products'], 'catalog_date' => $session['catalog_date'], 'dry_run' => $session['dry_run'] ) );
+		self::schedule_background_continue( true );
 
 		wp_send_json_success( self::session_response( $session ) );
 	}
@@ -461,7 +515,8 @@ class WTI_Importer {
 			wp_send_json_success( self::session_response( $session ) );
 		}
 
-		$result = self::process_stored_batch( 2, 2, false );
+		self::schedule_background_continue();
+		$result = self::session_response( $session );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result->get_error_message() );
@@ -473,10 +528,122 @@ class WTI_Importer {
 	private static function process_stored_batch( $simple_size = null, $variable_size = null, $send_json = true ) {
 		self::refresh_import_lock();
 
-		$plan       = get_transient( self::IMPORT_PLAN_TRANSIENT );
-		$media_plan = get_transient( self::MEDIA_PLAN_TRANSIENT );
+		if ( ! self::acquire_batch_lock() ) {
+			$response         = self::session_response( get_option( self::IMPORT_SESSION_OPTION, array() ) );
+			$response['busy'] = true;
+
+			if ( $send_json ) {
+				wp_send_json_success( $response );
+			}
+
+			return $response;
+		}
+
+		$result = self::process_stored_batch_unlocked( $simple_size, $variable_size, false );
+		self::release_batch_lock();
+
+		if ( is_wp_error( $result ) ) {
+			if ( $send_json ) {
+				wp_send_json_error( $result->get_error_message() );
+			}
+
+			return $result;
+		}
+
+		if ( $send_json ) {
+			wp_send_json_success( $result );
+		}
+
+		return $result;
+	}
+
+	private static function select_variable_batch( $items, $offset, $limit ) {
+		$items  = is_array( $items ) ? $items : array();
+		$limit  = max( 0, absint( $limit ) );
+		$batch  = array();
+		$weight = 0;
+
+		if ( 0 === $limit ) {
+			return $batch;
+		}
+
+		foreach ( array_slice( $items, absint( $offset ), $limit ) as $item ) {
+			$variation_count = isset( $item['variations'] ) && is_array( $item['variations'] ) ? count( $item['variations'] ) : 1;
+			$variation_count = max( 1, $variation_count );
+
+			if ( $batch && $weight + $variation_count > self::MAX_VARIATIONS_PER_BATCH ) {
+				break;
+			}
+
+			$batch[] = $item;
+			$weight += $variation_count;
+
+			if ( $weight >= self::MAX_VARIATIONS_PER_BATCH ) {
+				break;
+			}
+		}
+
+		return $batch;
+	}
+
+	private static function select_media_batch( $items, $offset ) {
+		$items = is_array( $items ) ? $items : array();
+		$batch = array();
+		$existing_urls = self::existing_media_source_urls();
+
+		foreach ( array_slice( $items, absint( $offset ), self::REUSED_MEDIA_BATCH_SIZE ) as $item ) {
+			$requires_download = false;
+			foreach ( (array) ( $item['pictures'] ?? array() ) as $url ) {
+				if ( ! isset( $existing_urls[ (string) $url ] ) ) {
+					$requires_download = true;
+					break;
+				}
+			}
+
+			if ( $requires_download ) {
+				if ( ! $batch ) {
+					$batch[] = $item;
+				}
+				break;
+			}
+
+			$batch[] = $item;
+		}
+
+		return $batch;
+	}
+
+	private static function existing_media_source_urls() {
+		static $urls = null;
+		if ( null === $urls ) {
+			$urls = array_fill_keys(
+				array_map(
+					'strval',
+					(array) $GLOBALS['wpdb']->get_col(
+						"SELECT DISTINCT meta_value FROM {$GLOBALS['wpdb']->postmeta} WHERE meta_key = '_wti_source_image_url'"
+					)
+				),
+				true
+			);
+		}
+
+		return $urls;
+	}
+
+	private static function process_stored_batch_unlocked( $simple_size = null, $variable_size = null, $send_json = true ) {
+		self::refresh_import_lock();
+
+		$plan       = self::load_import_plan();
+		$media_plan = self::load_media_plan();
 		if ( ! is_array( $plan ) ) {
 			$session = get_option( self::IMPORT_SESSION_OPTION, array() );
+			if ( is_array( $session ) && 'completed' === ( $session['status'] ?? '' ) ) {
+				$response              = self::session_response( $session );
+				$response['completed'] = true;
+
+				return $response;
+			}
+
 			if ( is_array( $session ) ) {
 				$session['status']      = 'error';
 				$session['message']     = 'Import session expired. Start import again.';
@@ -499,15 +666,9 @@ class WTI_Importer {
 			return self::batch_error( 'Import is paused or not running.', $send_json );
 		}
 
-		$settings       = isset( $session['settings'] ) && is_array( $session['settings'] ) ? $session['settings'] : WTI_Admin::get_settings();
-		$simple_size    = null !== $simple_size ? absint( $simple_size ) : ( isset( $_POST['simple_batch_size'] ) ? min( 100, max( 1, absint( wp_unslash( $_POST['simple_batch_size'] ) ) ) ) : min( 50, max( 1, absint( $settings['import_limit'] ) ) ) );
-		$variable_size  = null !== $variable_size ? absint( $variable_size ) : ( isset( $_POST['variable_batch_size'] ) ? min( 20, max( 1, absint( wp_unslash( $_POST['variable_batch_size'] ) ) ) ) : min( 10, max( 1, absint( $settings['variable_limit'] ) ) ) );
-		$import_images  = isset( $settings['import_images'] ) && 'yes' === $settings['import_images'];
-
-		if ( $import_images ) {
-			$simple_size   = min( $simple_size, 2 );
-			$variable_size = min( $variable_size, 2 );
-		}
+		$settings      = isset( $session['settings'] ) && is_array( $session['settings'] ) ? $session['settings'] : WTI_Admin::get_settings();
+		$simple_size   = self::SIMPLE_BATCH_SIZE;
+		$variable_size = self::VARIABLE_BATCH_SIZE;
 
 		$simple_total   = count( $plan['simple'] );
 		$variable_total = count( $plan['variable'] );
@@ -525,7 +686,7 @@ class WTI_Importer {
 			$session['simple_offset'] += count( $batch_plan['simple'] );
 		} elseif ( $session['variable_offset'] < $variable_total ) {
 			$stage = 'variable';
-			$batch_plan['variable'] = array_slice( $plan['variable'], (int) $session['variable_offset'], $variable_size );
+			$batch_plan['variable'] = self::select_variable_batch( $plan['variable'], (int) $session['variable_offset'], $variable_size );
 			$session['variable_offset'] += count( $batch_plan['variable'] );
 		} elseif ( $session['deleted_offset'] < $deleted_total ) {
 			$stage = 'deleted';
@@ -533,7 +694,7 @@ class WTI_Importer {
 			$session['deleted_offset'] += count( $batch_plan['deleted'] );
 		} elseif ( ( $session['media_offset'] ?? 0 ) < $media_total ) {
 			$stage       = 'media';
-			$media_batch = array_slice( $media_plan, (int) $session['media_offset'], 2 );
+			$media_batch = self::select_media_batch( $media_plan, (int) $session['media_offset'] );
 			$session['media_offset'] += count( $media_batch );
 		}
 
@@ -573,13 +734,16 @@ class WTI_Importer {
 		}
 
 		self::merge_execution_into_session( $session, $execution );
+		$log_entries = self::build_batch_log_entries( $execution, $stage, $actions );
+		self::append_session_log_entries( $session, $log_entries );
 		if ( ! empty( $session['report_file'] ) && ! empty( $execution['report_rows'] ) && class_exists( 'WTI_Sync_Report' ) ) {
 			WTI_Sync_Report::append_rows( $session['report_file'], $execution['report_rows'] );
 		}
-		WTI_Feed_Index::save_from_store( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
-
 		$session['processed'] = min( $session['total'], (int) $session['simple_offset'] + (int) $session['variable_offset'] + (int) $session['deleted_offset'] + (int) ( $session['media_offset'] ?? 0 ) );
 		$session['status']    = 'running';
+		$session['stage']     = $stage;
+		$session['updated_at'] = current_time( 'mysql' );
+		$session['updated_ts'] = time();
 
 		if ( $session['simple_offset'] >= $simple_total && $session['variable_offset'] >= $variable_total && $session['deleted_offset'] >= $deleted_total && ( $session['media_offset'] ?? 0 ) >= $media_total ) {
 			return self::complete_ajax_session( $session, $execution, $stage, $send_json );
@@ -589,11 +753,9 @@ class WTI_Importer {
 		$response                 = self::session_response( $session );
 		$response['completed']    = false;
 		$response['stage']        = $stage;
-		$response['log_entries']  = self::build_batch_log_entries( $execution, $stage, $actions );
+		$response['log_entries']  = $log_entries;
 
-		if ( 'automatic' === ( $session['sync_type'] ?? '' ) ) {
-			self::schedule_automatic_continue();
-		}
+		self::schedule_background_continue();
 
 		if ( $send_json ) {
 			wp_send_json_success( $response );
@@ -602,10 +764,101 @@ class WTI_Importer {
 		return $response;
 	}
 
+	private static function sync_price_args( $settings ) {
+		return array(
+			'markup_percent' => isset( $settings['markup_percent'] ) ? $settings['markup_percent'] : 0,
+		);
+	}
+
+	private static function plan_storage_dir() {
+		$upload_dir = wp_upload_dir();
+		$base_dir   = empty( $upload_dir['basedir'] ) ? WP_CONTENT_DIR . '/uploads' : $upload_dir['basedir'];
+		$dir        = trailingslashit( $base_dir ) . 'wti-sync';
+
+		if ( ! wp_mkdir_p( $dir ) ) {
+			return '';
+		}
+
+		$index = trailingslashit( $dir ) . 'index.html';
+		if ( ! file_exists( $index ) ) {
+			@file_put_contents( $index, '' );
+		}
+
+		return $dir;
+	}
+
+	private static function plan_file_path( $file_name ) {
+		$dir = self::plan_storage_dir();
+
+		return '' === $dir ? '' : trailingslashit( $dir ) . $file_name;
+	}
+
+	private static function save_import_plan( $plan ) {
+		self::save_plan_file( self::IMPORT_PLAN_FILE, $plan );
+		delete_transient( self::IMPORT_PLAN_TRANSIENT );
+	}
+
+	private static function save_media_plan( $plan ) {
+		self::save_plan_file( self::MEDIA_PLAN_FILE, $plan );
+		delete_transient( self::MEDIA_PLAN_TRANSIENT );
+	}
+
+	private static function load_import_plan() {
+		return self::load_plan_file( self::IMPORT_PLAN_FILE, self::IMPORT_PLAN_TRANSIENT );
+	}
+
+	private static function load_media_plan() {
+		return self::load_plan_file( self::MEDIA_PLAN_FILE, self::MEDIA_PLAN_TRANSIENT );
+	}
+
+	private static function save_plan_file( $file_name, $plan ) {
+		$path = self::plan_file_path( $file_name );
+
+		if ( '' === $path ) {
+			set_transient( self::IMPORT_PLAN_FILE === $file_name ? self::IMPORT_PLAN_TRANSIENT : self::MEDIA_PLAN_TRANSIENT, $plan, 12 * HOUR_IN_SECONDS );
+			return;
+		}
+
+		$json = wp_json_encode( $plan );
+		if ( false === $json ) {
+			return;
+		}
+
+		@file_put_contents( $path, $json, LOCK_EX );
+	}
+
+	private static function load_plan_file( $file_name, $transient_name ) {
+		$path = self::plan_file_path( $file_name );
+
+		if ( '' !== $path && file_exists( $path ) ) {
+			$json = file_get_contents( $path );
+			$data = json_decode( (string) $json, true );
+
+			if ( is_array( $data ) ) {
+				return $data;
+			}
+		}
+
+		$legacy = get_transient( $transient_name );
+		return is_array( $legacy ) ? $legacy : false;
+	}
+
+	private static function delete_plan_files() {
+		foreach ( array( self::IMPORT_PLAN_FILE, self::MEDIA_PLAN_FILE ) as $file_name ) {
+			$path = self::plan_file_path( $file_name );
+			if ( '' !== $path && file_exists( $path ) ) {
+				@unlink( $path );
+			}
+		}
+
+		delete_transient( self::IMPORT_PLAN_TRANSIENT );
+		delete_transient( self::MEDIA_PLAN_TRANSIENT );
+	}
+
 	public static function handle_ajax_progress() {
 		self::check_ajax_request();
 		$response = self::session_response( get_option( self::IMPORT_SESSION_OPTION, array() ) );
-		$plan     = get_transient( self::IMPORT_PLAN_TRANSIENT );
+		$plan     = self::load_import_plan();
 
 		$response['can_resume'] = in_array( $response['status'], array( 'running', 'paused' ), true ) && is_array( $plan );
 		$response['plan_exists'] = is_array( $plan );
@@ -617,7 +870,10 @@ class WTI_Importer {
 		self::check_ajax_request();
 		$session           = get_option( self::IMPORT_SESSION_OPTION, array() );
 		$session['status'] = 'paused';
+		$session['updated_at'] = current_time( 'mysql' );
+		$session['updated_ts'] = time();
 		update_option( self::IMPORT_SESSION_OPTION, $session, false );
+		self::release_import_lock();
 		wp_send_json_success( self::session_response( $session ) );
 	}
 
@@ -625,16 +881,19 @@ class WTI_Importer {
 		self::check_ajax_request();
 		$session           = get_option( self::IMPORT_SESSION_OPTION, array() );
 		$session['status'] = 'running';
+		$session['updated_at'] = current_time( 'mysql' );
+		$session['updated_ts'] = time();
 		update_option( self::IMPORT_SESSION_OPTION, $session, false );
 		self::refresh_import_lock();
+		self::schedule_background_continue();
 		wp_send_json_success( self::session_response( $session ) );
 	}
 
 	public static function handle_ajax_reset() {
 		self::check_ajax_request();
-		delete_transient( self::IMPORT_PLAN_TRANSIENT );
-		delete_transient( self::MEDIA_PLAN_TRANSIENT );
+		self::delete_plan_files();
 		delete_option( self::IMPORT_SESSION_OPTION );
+		delete_option( self::BATCH_LOCK_OPTION );
 		self::unschedule_automatic_continue();
 		self::release_import_lock();
 		wp_send_json_success( array( 'reset' => true ) );
@@ -670,14 +929,34 @@ class WTI_Importer {
 		}
 	}
 
+	private static function append_session_log_entries( &$session, $entries ) {
+		if ( empty( $entries ) || ! is_array( $entries ) ) {
+			return;
+		}
+
+		if ( ! isset( $session['log_entries'] ) || ! is_array( $session['log_entries'] ) ) {
+			$session['log_entries'] = array();
+		}
+
+		foreach ( $entries as $entry ) {
+			$session['log_entries'][] = (string) $entry;
+		}
+
+		$session['log_entries'] = array_slice( $session['log_entries'], -40 );
+	}
+
 	private static function complete_ajax_session( $session, $last_execution = array(), $stage = '', $send_json = true ) {
 		$session['status']      = 'completed';
 		$session['finished_at'] = current_time( 'mysql' );
+		$session['updated_at']  = current_time( 'mysql' );
+		$session['updated_ts']  = time();
+		$session['stage']       = $stage;
 		$session['duration']    = isset( $session['start_time'] ) ? round( microtime( true ) - (float) $session['start_time'], 2 ) : 0;
+		self::append_session_log_entries( $session, self::build_batch_log_entries( $last_execution, $stage, array() ) );
 
 		update_option( self::IMPORT_SESSION_OPTION, $session, false );
-		delete_transient( self::IMPORT_PLAN_TRANSIENT );
-		delete_transient( self::MEDIA_PLAN_TRANSIENT );
+		self::delete_plan_files();
+		self::unschedule_automatic_continue();
 		self::release_import_lock();
 
 		$result = array(
@@ -696,14 +975,14 @@ class WTI_Importer {
 
 		self::save_last_result( isset( $session['started_at'] ) ? $session['started_at'] : current_time( 'mysql' ), $result );
 		self::save_last_catalog_date( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
-		WTI_Feed_Index::save_from_store( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '' );
+		WTI_Feed_Index::save_from_store( isset( $session['catalog_date'] ) ? $session['catalog_date'] : '', self::sync_price_args( isset( $session['settings'] ) && is_array( $session['settings'] ) ? $session['settings'] : WTI_Admin::get_settings() ) );
 		self::flush_site_caches();
 		WTI_Logger::log( 'AJAX import completed.', $result );
 
 		$response                = self::session_response( $session );
 		$response['completed']   = true;
 		$response['stage']       = $stage;
-		$response['log_entries'] = self::build_batch_log_entries( $last_execution, $stage, array() );
+		$response['log_entries'] = isset( $session['log_entries'] ) ? $session['log_entries'] : array();
 		if ( $send_json ) {
 			wp_send_json_success( $response );
 		}
@@ -719,7 +998,41 @@ class WTI_Importer {
 		return new WP_Error( 'wti_batch_error', $message );
 	}
 
-	private static function schedule_automatic_continue() {
+	private static function acquire_batch_lock() {
+		$now  = time();
+		$lock = (int) get_option( self::BATCH_LOCK_OPTION, 0 );
+
+		if ( $lock && $lock > ( $now - 180 ) ) {
+			return false;
+		}
+
+		if ( $lock ) {
+			delete_option( self::BATCH_LOCK_OPTION );
+		}
+
+		return add_option( self::BATCH_LOCK_OPTION, $now, '', false );
+	}
+
+	private static function release_batch_lock() {
+		delete_option( self::BATCH_LOCK_OPTION );
+	}
+
+	private static function schedule_background_continue( $force = false ) {
+		if ( defined( 'WTI_AS_CONTINUE_HOOK' ) && function_exists( 'as_next_scheduled_action' ) && function_exists( 'as_enqueue_async_action' ) ) {
+			$group = defined( 'WTI_AS_GROUP' ) ? WTI_AS_GROUP : '';
+
+			if ( ! $force && as_next_scheduled_action( WTI_AS_CONTINUE_HOOK, array(), $group ) ) {
+				return;
+			}
+
+			if ( function_exists( 'as_schedule_single_action' ) ) {
+				as_schedule_single_action( time() + 5, WTI_AS_CONTINUE_HOOK, array(), $group, false );
+			} else {
+				as_enqueue_async_action( WTI_AS_CONTINUE_HOOK, array(), $group, false );
+			}
+			return;
+		}
+
 		if ( ! defined( 'WTI_CRON_CONTINUE_HOOK' ) ) {
 			return;
 		}
@@ -729,7 +1042,30 @@ class WTI_Importer {
 		}
 	}
 
+	private static function cancel_pending_background_actions() {
+		if ( defined( 'WTI_AS_CONTINUE_HOOK' ) && function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( WTI_AS_CONTINUE_HOOK, array(), defined( 'WTI_AS_GROUP' ) ? WTI_AS_GROUP : '' );
+		}
+
+		if ( defined( 'WTI_CRON_CONTINUE_HOOK' ) ) {
+			$timestamp = wp_next_scheduled( WTI_CRON_CONTINUE_HOOK );
+			if ( $timestamp ) {
+				wp_unschedule_event( $timestamp, WTI_CRON_CONTINUE_HOOK );
+			}
+		}
+
+		delete_option( self::BATCH_LOCK_OPTION );
+	}
+
+	private static function schedule_automatic_continue() {
+		self::schedule_background_continue();
+	}
+
 	private static function unschedule_automatic_continue() {
+		if ( defined( 'WTI_AS_CONTINUE_HOOK' ) && function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( WTI_AS_CONTINUE_HOOK, array(), defined( 'WTI_AS_GROUP' ) ? WTI_AS_GROUP : '' );
+		}
+
 		if ( ! defined( 'WTI_CRON_CONTINUE_HOOK' ) ) {
 			return;
 		}
@@ -816,6 +1152,8 @@ class WTI_Importer {
 			'catalog_date'       => isset( $session['catalog_date'] ) ? $session['catalog_date'] : '',
 			'report_url'         => ! empty( $session['report_file'] ) && class_exists( 'WTI_Sync_Report' ) ? WTI_Sync_Report::url_for_file( $session['report_file'] ) : '',
 			'dry_run'            => ! empty( $session['dry_run'] ),
+			'stage'              => isset( $session['stage'] ) ? (string) $session['stage'] : '',
+			'log_entries'        => isset( $session['log_entries'] ) && is_array( $session['log_entries'] ) ? $session['log_entries'] : array(),
 		);
 	}
 
@@ -893,13 +1231,14 @@ class WTI_Importer {
 		);
 	}
 
-	private static function build_media_plan( $plan ) {
+	private static function build_media_plan( $plan, $args = array() ) {
 		$media_plan = array();
 		$previous   = get_option( WTI_Feed_Index::OPTION_KEY, array() );
 		$rows       = isset( $previous['offers'] ) && is_array( $previous['offers'] ) ? $previous['offers'] : array();
+		$price_only = WTI_Feed_Index::markup_changed_from_store( $args );
 
 		foreach ( isset( $plan['simple'] ) ? $plan['simple'] : array() as $offer ) {
-			if ( self::offer_needs_media_job( $offer, $rows ) ) {
+			if ( self::offer_needs_media_job( $offer, $rows, $price_only ) ) {
 				$media_plan[] = self::media_offer_row( $offer, 'simple' );
 			}
 		}
@@ -907,29 +1246,26 @@ class WTI_Importer {
 		foreach ( isset( $plan['variable'] ) ? $plan['variable'] : array() as $variable ) {
 			$parent = isset( $variable['parent'] ) ? $variable['parent'] : array();
 
-			if ( self::offer_needs_media_job( $parent, $rows ) ) {
+			if ( self::offer_needs_media_job( $parent, $rows, $price_only ) ) {
 				$media_plan[] = self::media_offer_row( $parent, 'variable' );
+			}
+
+			foreach ( isset( $variable['variations'] ) ? (array) $variable['variations'] : array() as $variation ) {
+				if ( self::offer_needs_media_job( $variation, $rows, $price_only ) ) {
+					$media_plan[] = self::media_offer_row( $variation, 'variation' );
+				}
 			}
 		}
 
 		return $media_plan;
 	}
 
-	private static function offer_needs_media_job( $offer, $previous_rows ) {
+	private static function offer_needs_media_job( $offer, $previous_rows, $price_only = false ) {
 		if ( empty( $offer['pictures'] ) || ! class_exists( 'WTI_Image_Sync' ) ) {
 			return false;
 		}
 
-		$offer_id = isset( $offer['id'] ) ? (string) $offer['id'] : '';
-
-		if ( '' === $offer_id || empty( $previous_rows[ $offer_id ] ) ) {
-			return true;
-		}
-
-		$expected_hash = WTI_Image_Sync::build_image_set_hash_from_urls( $offer['pictures'] );
-		$current_hash  = isset( $previous_rows[ $offer_id ]['image_hash'] ) ? (string) $previous_rows[ $offer_id ]['image_hash'] : '';
-
-		return '' === $current_hash || $current_hash !== $expected_hash;
+		return WTI_Product_Sync::offer_needs_image_sync( $offer );
 	}
 
 	private static function media_offer_row( $offer, $type ) {
@@ -1007,17 +1343,16 @@ class WTI_Importer {
 	}
 
 	private static function acquire_import_lock() {
+		self::recover_stale_import_session( 'manual' );
+
 		$lock = get_transient( self::IMPORT_LOCK_TRANSIENT );
 		if ( $lock ) {
 			$session = get_option( self::IMPORT_SESSION_OPTION, array() );
 			$status  = isset( $session['status'] ) ? (string) $session['status'] : '';
 			$age     = time() - absint( $lock );
 
-			if ( $age > 15 * MINUTE_IN_SECONDS ) {
-				self::release_import_lock();
-				delete_transient( self::IMPORT_PLAN_TRANSIENT );
-				delete_transient( self::MEDIA_PLAN_TRANSIENT );
-				delete_option( self::IMPORT_SESSION_OPTION );
+			if ( $age > self::STALE_SESSION_SECONDS ) {
+				self::mark_stale_session_closed( $session, 'Import lock stopped updating.' );
 				$status = '';
 			}
 
@@ -1029,8 +1364,8 @@ class WTI_Importer {
 		}
 
 		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
-		if ( is_array( $session ) && in_array( isset( $session['status'] ) ? (string) $session['status'] : '', array( 'running', 'paused' ), true ) && ! get_transient( self::IMPORT_PLAN_TRANSIENT ) ) {
-			delete_transient( self::MEDIA_PLAN_TRANSIENT );
+		if ( is_array( $session ) && in_array( isset( $session['status'] ) ? (string) $session['status'] : '', array( 'running', 'paused' ), true ) && ! self::load_import_plan() ) {
+			self::delete_plan_files();
 			delete_option( self::IMPORT_SESSION_OPTION );
 		}
 
@@ -1044,6 +1379,8 @@ class WTI_Importer {
 			'status'             => 'running',
 			'sync_type'          => 'manual',
 			'started_at'         => current_time( 'mysql' ),
+			'updated_at'         => current_time( 'mysql' ),
+			'updated_ts'         => time(),
 			'start_time'         => microtime( true ),
 			'catalog_date'       => '',
 			'total'              => 0,
@@ -1082,6 +1419,8 @@ class WTI_Importer {
 		$session['sync_type']   = $sync_type;
 		$session['started_at']  = isset( $session['started_at'] ) ? $session['started_at'] : $started;
 		$session['finished_at'] = current_time( 'mysql' );
+		$session['updated_at']  = current_time( 'mysql' );
+		$session['updated_ts']  = time();
 		$session['message']     = $message;
 
 		if ( '' !== $catalog_date ) {
@@ -1100,6 +1439,57 @@ class WTI_Importer {
 		set_transient( self::IMPORT_LOCK_TRANSIENT, time(), 30 * MINUTE_IN_SECONDS );
 	}
 
+	private static function recover_stale_import_session( $replacement_sync_type = '' ) {
+		$session = get_option( self::IMPORT_SESSION_OPTION, array() );
+
+		if ( ! is_array( $session ) || ! in_array( isset( $session['status'] ) ? (string) $session['status'] : '', array( 'preparing', 'running', 'paused' ), true ) ) {
+			return false;
+		}
+
+		if ( 'automatic' === $replacement_sync_type && 'automatic' === ( $session['sync_type'] ?? '' ) && is_array( self::load_import_plan() ) ) {
+			return false;
+		}
+
+		if ( ! self::is_session_stale( $session ) ) {
+			return false;
+		}
+
+		return self::mark_stale_session_closed( $session, 'Previous sync stopped responding and was closed automatically.' );
+	}
+
+	private static function is_session_stale( $session ) {
+		$lock = get_transient( self::IMPORT_LOCK_TRANSIENT );
+		$last = $lock ? absint( $lock ) : 0;
+
+		if ( empty( $last ) && ! empty( $session['updated_ts'] ) ) {
+			$last = absint( $session['updated_ts'] );
+		}
+
+		if ( empty( $last ) && ! empty( $session['start_time'] ) ) {
+			$last = (int) floor( (float) $session['start_time'] );
+		}
+
+		return empty( $last ) || ( time() - $last ) > self::STALE_SESSION_SECONDS;
+	}
+
+	private static function mark_stale_session_closed( $session, $message ) {
+		$session = is_array( $session ) ? $session : array();
+		$session['status']            = 'interrupted';
+		$session['message']           = $message;
+		$session['finished_at']       = current_time( 'mysql' );
+		$session['updated_at']        = current_time( 'mysql' );
+		$session['updated_ts']        = time();
+		$session['auto_closed_stale'] = true;
+
+		update_option( self::IMPORT_SESSION_OPTION, $session, false );
+		self::delete_plan_files();
+		self::unschedule_automatic_continue();
+		self::release_import_lock();
+		WTI_Logger::log( 'Stale sync session closed automatically.', array( 'sync_type' => $session['sync_type'] ?? '', 'message' => $message ) );
+
+		return true;
+	}
+
 	private static function release_import_lock() {
 		delete_transient( self::IMPORT_LOCK_TRANSIENT );
 	}
@@ -1110,6 +1500,8 @@ class WTI_Importer {
 			$session['status']      = 'error';
 			$session['message']     = $message;
 			$session['finished_at'] = current_time( 'mysql' );
+			$session['updated_at']  = current_time( 'mysql' );
+			$session['updated_ts']  = time();
 			update_option( self::IMPORT_SESSION_OPTION, $session, false );
 		}
 		self::release_import_lock();

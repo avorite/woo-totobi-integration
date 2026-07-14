@@ -6,6 +6,8 @@ class WTI_Image_Sync {
 	const META_SOURCE_URL  = '_wti_source_image_url';
 	const META_SOURCE_HASH = '_wti_source_image_hash';
 	const META_IMAGE_SET_HASH = '_wti_image_set_hash';
+	const META_ATTACHMENT_SET_HASH = '_wti_image_attachment_set_hash';
+	const DOWNLOAD_TIMEOUT = 5;
 
 	public static function sync_product_images( $product, $image_urls ) {
 		$image_urls = array_values( array_filter( array_unique( (array) $image_urls ) ) );
@@ -28,6 +30,7 @@ class WTI_Image_Sync {
 		$current_ids = self::get_current_product_image_ids( $product );
 
 		if ( self::current_images_match_desired_set( $product, $current_ids, $desired ) ) {
+			$product->update_meta_data( self::META_ATTACHMENT_SET_HASH, self::build_attachment_set_hash( $current_ids ) );
 			return array(
 				'featured_id'    => isset( $current_ids[0] ) ? (int) $current_ids[0] : 0,
 				'gallery_ids'    => array_slice( $current_ids, 1 ),
@@ -93,7 +96,14 @@ class WTI_Image_Sync {
 		}
 
 		$product->set_gallery_image_ids( $gallery_ids );
-		$product->update_meta_data( self::META_IMAGE_SET_HASH, self::build_image_set_hash( $desired ) );
+
+		if ( empty( $errors ) && $featured_id ) {
+			$product->update_meta_data( self::META_IMAGE_SET_HASH, self::build_image_set_hash( $desired ) );
+			$product->update_meta_data( self::META_ATTACHMENT_SET_HASH, self::build_attachment_set_hash( $attachment_ids ) );
+		} else {
+			$product->delete_meta_data( self::META_IMAGE_SET_HASH );
+			$product->delete_meta_data( self::META_ATTACHMENT_SET_HASH );
+		}
 
 		return array(
 			'featured_id'    => $featured_id,
@@ -119,7 +129,7 @@ class WTI_Image_Sync {
 			return $existing_id;
 		}
 
-		$tmp = download_url( $url, 60 );
+		$tmp = download_url( $url, self::DOWNLOAD_TIMEOUT );
 
 		if ( is_wp_error( $tmp ) ) {
 			return $tmp;
@@ -178,7 +188,7 @@ class WTI_Image_Sync {
 			);
 		}
 
-		$tmp = download_url( $url, 60 );
+		$tmp = download_url( $url, self::DOWNLOAD_TIMEOUT );
 
 		if ( is_wp_error( $tmp ) ) {
 			return $tmp;
@@ -239,6 +249,10 @@ class WTI_Image_Sync {
 
 	public static function build_image_set_hash_from_urls( $image_urls ) {
 		return self::build_image_set_hash( self::build_desired_image_set( (array) $image_urls ) );
+	}
+
+	public static function build_attachment_set_hash_from_product( $product ) {
+		return self::build_attachment_set_hash( self::get_current_product_image_ids( $product ) );
 	}
 
 	private static function get_current_product_image_ids( $product ) {
@@ -312,6 +326,10 @@ class WTI_Image_Sync {
 		}
 
 		return md5( implode( '|', $parts ) );
+	}
+
+	private static function build_attachment_set_hash( $attachment_ids ) {
+		return md5( wp_json_encode( array_values( array_unique( array_map( 'absint', (array) $attachment_ids ) ) ) ) );
 	}
 
 	private static function find_attachment_by_source_url( $url ) {

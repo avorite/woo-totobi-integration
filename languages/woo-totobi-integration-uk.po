@@ -61,8 +61,11 @@ msgstr "Інтервал синхронізації"
 msgid "Every 4 hours"
 msgstr "Кожні 4 години"
 
-msgid "Every 6 hours"
-msgstr "Кожні 6 годин"
+msgid "Every 8 hours"
+msgstr "Кожні 8 годин"
+
+msgid "Every 12 hours"
+msgstr "Кожні 12 годин"
 
 msgid "Daily"
 msgstr "Щодня"
@@ -77,10 +80,10 @@ msgid "Products are published automatically. Images are imported from Totobi and
 msgstr "Товари публікуються автоматично. Зображення імпортуються з Totobi, а незмінені товари пропускаються."
 
 msgid "Set products missing from the Totobi list out of stock in selected categories"
-msgstr "Ставити товари, яких немає у списку Totobi, не в наявності у вибраних категоріях"
+msgstr "Ставити товари, відсутні у списку Totobi, у статус немає в наявності у вибраних категоріях"
 
 msgid "Disabled by default. When enabled, products in the selected WooCommerce categories that are not found in the current Totobi feed are set to out of stock with quantity 0."
-msgstr "За замовчуванням вимкнено. Якщо увімкнути, товари у вибраних категоріях WooCommerce, яких немає у поточному фіді Totobi, отримають статус не в наявності та кількість 0."
+msgstr "За замовчуванням вимкнено. Якщо увімкнути, товари з вибраних категорій WooCommerce, яких немає в поточному фіді Totobi, будуть переведені у статус немає в наявності з кількістю 0."
 
 msgid "Save settings"
 msgstr "Зберегти налаштування"
@@ -291,9 +294,6 @@ msgstr "варіативні товари"
 
 msgid "missing products"
 msgstr "відсутні товари"
-
-msgid "product images"
-msgstr "зображення товарів"
 
 msgid "Processing %stage%: %processed% of %total%"
 msgstr "Обробка: %stage%, %processed% із %total%"
